@@ -1,0 +1,80 @@
+package inc
+
+import "http://www.yakindu.org/sct/sexec/1.0.0"
+import "http://www.yakindu.org/base/types/2.0.0"
+import "http://www.yakindu.org/sct/statechart/SGen"
+import "http://www.yakindu.org/sct/sgraph/2.0.0"
+import "http://www.yakindu.org/base/base/2.0.0"
+import "http://www.yakindu.org/sct/statechart/SText"
+
+// Region-ök entry-kkel
+pattern regionsWithEntries(region, entry) {
+	Entry.parentRegion(entry, region);
+}
+
+// Choice-ok lekérése
+pattern choices(choice, region) {
+	Choice.parentRegion(choice, region);
+}
+
+// Változók lekérése
+pattern variableDefinitions(variable) {
+	VariableDefinition(variable);
+}
+
+// Region-ök lekérése
+pattern regions(name, region, entry) {
+	Region.name(region, name);
+	Entry.parentRegion(entry, region);
+}
+
+// Guardokat leszedi
+pattern outGuard(t, p, guard) {
+	Transition.trigger(t,p);
+	ReactionTrigger.guard(p,guard);
+}
+
+// Effecttel és triggerrel rendelkezõ tranziciókat leszedi
+pattern outgoing(s, ts) {
+	State.outgoingTransitions(s, ts);
+	Transition.effect(ts, _e);
+	Transition.trigger(ts, _t);	
+}
+
+pattern SatechartToStateName(stateChart, name, state, region) {
+	Statechart.regions.vertices(stateChart, state);
+	State.name(state, name);
+	State.parentRegion(state, region);
+}
+
+pattern interfaceWithVariables(interface) {
+	InterfaceScope(interface);
+}
+
+pattern states(state, parentRegion, name) {
+	State.parentRegion(state, parentRegion);
+	State.name(state, name);
+}
+
+pattern getEntry(region, entry, name) {
+	Region.vertices.name(region, name);
+	Entry.name(entry, name);
+}
+
+pattern getExit(exit, name) {
+	Entry.name(exit, name);
+}
+
+pattern exitNodes(exit, region) {
+	Exit.parentRegion(exit, region);
+}
+
+pattern sourceAndTargetOfTransitions(transition, source, target) {
+	Transition.source(transition, source);
+	Transition.target(transition, target);
+}
+
+// Final state-ek lekérése
+pattern finalStates(finalState, region) {
+	FinalState.parentRegion(finalState, region);
+}
