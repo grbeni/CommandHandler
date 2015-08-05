@@ -30,7 +30,6 @@ import org.yakindu.sct.model.sgraph.State;
 import org.yakindu.sct.model.sgraph.Statechart;
 import org.yakindu.sct.model.sgraph.Transition;
 import org.yakindu.sct.model.sgraph.Vertex;
-import org.yakindu.sct.model.sgraph.impl.StatechartImpl;
 import org.yakindu.sct.model.stext.stext.EntryEvent;
 import org.yakindu.sct.model.stext.stext.ExitEvent;
 import org.yakindu.sct.model.stext.stext.ReactionEffect;
