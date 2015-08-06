@@ -24,12 +24,6 @@ pattern regions(regionName, region, entry) {
 	Entry.parentRegion(entry, region);
 }
 
-// Guardokat leszedi: késõbb jól jöhet
-pattern outGuard(t, p, guard) {
-	Transition.trigger(t,p);
-	ReactionTrigger.guard(p,guard);
-}
-
 // Beni patternje
 pattern SatechartToStateName(stateChart, name, state, region) {
 	Statechart.regions.vertices(stateChart, state);
@@ -69,7 +63,7 @@ pattern finalStates(finalState, region) {
 // Azonos regionben lévõ vertexek közötti transitionöket adja vissza
 pattern edgesInSameRegion(transition : Transition, source : Vertex, target : Vertex) {
 	Transition.source(transition, source);
-	Transition.target(transitin, target);
+	Transition.target(transition, target);
 	Transition.source.parentRegion(transition, parentRegion);
 	Transition.target.parentRegion(transition, parentRegion);
 }
@@ -78,7 +72,7 @@ pattern edgesInSameRegion(transition : Transition, source : Vertex, target : Ver
 // Hogy lehet megmondani, hogy a két régió különbözzön?
 pattern edgesAcrossRegions(transition : Transition, source : Vertex, target : Vertex) {
 	Transition.source(transition, source);
-	Transition.target(transitin, target);
+	Transition.target(transition, target);
 	Transition.source.parentRegion(transition, parentRegion1);
 	Transition.target.parentRegion(transition, parentRegion2);	
 	parentRegion1 != parentRegion2;
