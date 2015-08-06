@@ -183,12 +183,12 @@ public class CommandHandler extends AbstractHandler {
 			Template template = null;			
 			// Kiszedjük a template nevekbõl a szóközöket, mert az UPPAAL nem szereti
 			if (regionMatch.getRegion().getComposite() instanceof Statechart) {
-				template = builder.createTemplate(regionMatch.getName().replaceAll(" ", "") + "OfStatechart");
+				template = builder.createTemplate(regionMatch.getRegionName().replaceAll(" ", "") + "OfStatechart");
 				// Mégis foglalkozunk, hogy a regionökön átívelõ tranziciók helyes lefutása garantálható legyen
 				builder.addLocalDeclaration("bool " + isValidVar + " = true;", template);
 			} 
 			else {
-				template = builder.createTemplate(regionMatch.getName().replaceAll(" ", "") + "Of" + ((State) regionMatch.getRegion().getComposite()).getName());
+				template = builder.createTemplate(regionMatch.getRegionName().replaceAll(" ", "") + "Of" + ((State) regionMatch.getRegion().getComposite()).getName());
 				// Az alsóbb szinteken kezdetben false érvényességi változót vezetünk be
 				builder.addLocalDeclaration("bool " + isValidVar + " = false;", template);
 			}			

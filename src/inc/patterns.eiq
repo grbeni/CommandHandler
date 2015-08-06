@@ -7,64 +7,49 @@ import "http://www.yakindu.org/sct/sgraph/2.0.0"
 import "http://www.yakindu.org/base/base/2.0.0"
 import "http://www.yakindu.org/sct/statechart/SText"
 
-// Region-ök entry-kkel
-pattern regionsWithEntries(region, entry) {
-	Entry.parentRegion(entry, region);
-}
-
 // Choice-ok lekérése
 pattern choices(choice, region) {
 	Choice.parentRegion(choice, region);
 }
 
 // Változók lekérése
-pattern variableDefinitions(variable) {
-	VariableDefinition(variable);
+pattern variableDefinitions(variable, isConst, name) {
+	VariableDefinition.const(variable, isConst);
+	VariableDefinition.name(variable, name);
 }
 
 // Region-ök lekérése
-pattern regions(name, region, entry) {
-	Region.name(region, name);
+pattern regions(regionName, region, entry) {
+	Region.name(region, regionName);
 	Entry.parentRegion(entry, region);
 }
 
-// Guardokat leszedi
+// Guardokat leszedi: késõbb jól jöhet
 pattern outGuard(t, p, guard) {
 	Transition.trigger(t,p);
 	ReactionTrigger.guard(p,guard);
 }
 
-// Effecttel és triggerrel rendelkezõ tranziciókat leszedi
-pattern outgoing(s, ts) {
-	State.outgoingTransitions(s, ts);
-	Transition.effect(ts, _e);
-	Transition.trigger(ts, _t);	
-}
-
+// Beni patternje
 pattern SatechartToStateName(stateChart, name, state, region) {
 	Statechart.regions.vertices(stateChart, state);
 	State.name(state, name);
 	State.parentRegion(state, region);
 }
 
-pattern interfaceWithVariables(interface) {
-	InterfaceScope(interface);
-}
-
-pattern states(state, parentRegion, name) {
+// Visszaadja az összes state-et a parentRegionjével és nevével
+pattern states(state : State, parentRegion : Region, name) {
 	State.parentRegion(state, parentRegion);
 	State.name(state, name);
 }
 
+// Beni patternje
 pattern getEntry(region, entry, name) {
 	Region.vertices.name(region, name);
 	Entry.name(entry, name);
 }
 
-pattern getExit(exit, name) {
-	Entry.name(exit, name);
-}
-
+// Visszaadja az exit node-okat és parentRegionjüket
 pattern exitNodes(exit, region) {
 	Exit.parentRegion(exit, region);
 }
@@ -77,4 +62,71 @@ pattern sourceAndTargetOfTransitions(transition, source, target) {
 // Final state-ek lekérése
 pattern finalStates(finalState, region) {
 	FinalState.parentRegion(finalState, region);
+}
+
+// Összetettebb patternek, amelyeket késõbb hoztam létre
+
+// Azonos regionben lévõ vertexek közötti transitionöket adja vissza
+pattern edgesInSameRegion(transition : Transition, source : Vertex, target : Vertex) {
+	Transition.source(transition, source);
+	Transition.target(transitin, target);
+	Transition.source.parentRegion(transition, parentRegion);
+	Transition.target.parentRegion(transition, parentRegion);
+}
+
+// Különbözõ regionben lévõ vertexek közötti transitionöket adja vissza
+// Hogy lehet megmondani, hogy a két régió különbözzön?
+pattern edgesAcrossRegions(transition : Transition, source : Vertex, target : Vertex) {
+	Transition.source(transition, source);
+	Transition.target(transitin, target);
+	Transition.source.parentRegion(transition, parentRegion1);
+	Transition.target.parentRegion(transition, parentRegion2);	
+	parentRegion1 != parentRegion2;
+}
+
+// Composite state-eket adja vissza
+pattern compositeStates(compositeState : State, name) {
+	State.composite(compositeState, true);
+	State.name(compositeState, name);
+}
+
+// Az ReactionEffecttel rendelkezõ transitionöket aadja vissza
+pattern edgesWithEffect(transition : Transition, effect : ReactionEffect) {
+	Transition.effect(transition, effect);
+	ReactionEffect(effect);
+}
+
+// Az EntryEventtel rendelkezõ state-ek effectjét adja vissza
+pattern statesWithEntryEvent(state : State, effect : ReactionEffect) {
+	State.localReactions(state, reaction);
+	Reaction.trigger(reaction, trigger);
+	ReactionTrigger.triggers(trigger, entryEvent);
+	EntryEvent(entryEvent);
+	Reaction.effect(reaction, effect);
+	ReactionEffect(effect);
+}
+
+// Az ExitEventtel rendelkezõ state-ek effectjét adja vissza
+pattern statesWithExitEvent(state : State, effect : ReactionEffect) {
+	State.localReactions(state, reaction);
+	Reaction.trigger(reaction, trigger);
+	ReactionTrigger.triggers(trigger, exitEvent);
+	ExitEvent(exitEvent);
+	Reaction.effect(reaction, effect);
+	ReactionEffect(effect);
+}
+
+// A ReactionEffectek Expressionjeit adja vissza
+pattern reactionEffectToExpression(reactionEffect : ReactionEffect, expression) {
+	ReactionEffect.actions(reactionEffect, expression);
+}
+
+pattern guardToExpression(guard : Guard, expression) {
+	Guard.expression(guard, expression);
+}
+
+// A guarddal rendelkezõ transitionöket adja vissza
+pattern edgesWithGuard(transition : Transition, guard : Guard) {
+	Transition.trigger(transition, trigger);
+	ReactionTrigger.guard(trigger, guard);
 }
