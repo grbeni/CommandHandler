@@ -1,14 +1,11 @@
 package inc
 
-import org.yakindu.base.expressions.expressions.Expression
-import org.eclipse.ui.internal.expressions.AndExpression
+import org.yakindu.base.expressions.expressions.ElementReferenceExpression
 import org.yakindu.base.expressions.expressions.LogicalAndExpression
 import org.yakindu.base.expressions.expressions.LogicalOrExpression
 import org.yakindu.base.expressions.expressions.LogicalRelationExpression
-import org.yakindu.base.expressions.expressions.RelationalOperator
 import org.yakindu.base.expressions.expressions.PrimitiveValueExpression
-import org.yakindu.base.expressions.expressions.BoolLiteral
-import org.yakindu.base.expressions.expressions.ElementReferenceExpression
+import org.yakindu.base.expressions.expressions.RelationalOperator
 
 class ExpressionTransformer {
 	

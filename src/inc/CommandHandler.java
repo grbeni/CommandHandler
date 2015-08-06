@@ -1,6 +1,6 @@
 package inc;
 
-import hu.bme.mit.inf.alf.uppaal.transformation.UppaalModelBuilder;
+import hu.bme.mit.inf.alf.uppaal.transformation.UppaalModelBuilder; 
 import hu.bme.mit.inf.alf.uppaal.transformation.UppaalModelSaver;
 import hu.bme.mit.inf.alf.uppaal.transformation.serialization.UppaalModelSerializer;
 
@@ -44,7 +44,7 @@ import de.uni_paderborn.uppaal.templates.Template;
  * Függ a PatternMatcher és az UppaalModelBuilder osztályoktól.
  * @author Graics Bence 
  * Kell még:
- * -Synchronization?
+ * -Synchronization node?
  * -Idõmérés?
  * 
  * Location-ök:
@@ -56,8 +56,8 @@ import de.uni_paderborn.uppaal.templates.Template;
  *  - composite state kilépõ élei: legfelsõ ! él, minden alatta lévõ régióban ? élek isValidVar + " = false" -szal
  *  - különbözõ absztrakciós szinteket összekötõ élek
  */
-public class CommandHandler extends AbstractHandler {	
-	
+public class CommandHandler extends AbstractHandler {
+	 
 	// Uppaal változónevek
 	private final String syncChanVar = "syncChan";
 	private final String isValidVar = "isValid";
