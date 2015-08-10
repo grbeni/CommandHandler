@@ -450,10 +450,12 @@ public class CommandHandler extends AbstractHandler {
 				builder.setEdgeSync(entryEdge, syncChanVar + (syncChanId), true);
 				// Minden eggyel alatti régióban létrehozzuk a szükséges ? sync-eket
 				for (RegionsOfCompositeStatesMatch regionsOfCompositeStatesMatch : matcher.getAllRegionsOfCompositeStates()) {
+					// Az adott compositeState regionjeit keressük
 					if (regionsOfCompositeStatesMatch.getCompositeState() == compositeStateMatch.getCompositeState()) {
 						// Ha van historyja: önmagába (vagy composite-nál az entryLocationbe) kötjük
 						if (getEntryOfRegion(regionsOfCompositeStatesMatch.getSubregion()).getKind().getValue() != 0 || hasDeepHistoryAbove(regionsOfCompositeStatesMatch.getSubregion())) {
 							for (VerticesOfRegionsMatch verticesOfRegionMatch : matcher.getAllVerticesOfRegions()) {
+								// Az adott subregion vertexeit vizsgáljuk
 								if (verticesOfRegionMatch.getRegion() == regionsOfCompositeStatesMatch.getSubregion()) {
 									// Csak ha nem choice
 									if (!(isChoice(verticesOfRegionMatch.getVertex()))) {
@@ -474,6 +476,7 @@ public class CommandHandler extends AbstractHandler {
 						// Ha nincs historyja: region entry-be kötjük
 						else {
 							for (VerticesOfRegionsMatch verticesOfRegionMatch : matcher.getAllVerticesOfRegions()) {
+								// Az adott subregion vertexeit vizsgáljuk
 								if (verticesOfRegionMatch.getRegion() == regionsOfCompositeStatesMatch.getSubregion()) {
 									Edge toEntryEdge = builder.createEdge(regionTemplateMap.get(verticesOfRegionMatch.getRegion()));
 									builder.setEdgeSync(toEntryEdge, syncChanVar + syncChanId, false);
@@ -495,25 +498,21 @@ public class CommandHandler extends AbstractHandler {
 	 * @throws IncQueryException
 	 */
 	private void createExitEdgesForAbstractionLevels() throws IncQueryException {
-		// Lekérjük az állapotokat
-		Collection<StatesMatch> allStateMatches = matcher.getAllStates();
-		// Megnézzük az összes state matchet
-		for (StatesMatch stateMatch : allStateMatches) {
-			State state = stateMatch.getState();
-			if (state.isComposite()) {
-				builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
-				// Minden kimenõ élre ráírjuk a kilépési sync-et
-				for (Transition transition : transitionEdgeMap.keySet()) {
-					if (state.getOutgoingTransitions().contains(transition)) {
-						builder.setEdgeSync(transitionEdgeMap.get(transition), syncChanVar + (syncChanId), true);
-					}
+		// Lekérjük a composite állapotokat
+		Collection<CompositeStatesMatch> allCompositeStateMatches = matcher.getAllCompositeStates();
+		// Megnézzük az összes compositeState matchet
+		for (CompositeStatesMatch compositeStateMatch : allCompositeStateMatches) {
+			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
+			// Minden kimenõ élre ráírjuk a kilépési sync-et
+			for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : matcher.getAllTransitions()) {
+				if (sourceAndTargetOfTransitionsMatch.getSource() == compositeStateMatch.getCompositeState()) {
+					builder.setEdgeSync(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), syncChanVar + (syncChanId), true);
 				}
-				// Letiltjuk az összes alatta lévõ region-t
-				List<Region> subregionList = new ArrayList<Region>();
-				addAllSubregionsToRegionList(state, subregionList);
-				setAllRegionsWithSync(false, subregionList);
-				
 			}
+			// Letiltjuk az összes alatta lévõ region-t
+			List<Region> subregionList = new ArrayList<Region>();
+			addAllSubregionsToRegionList(compositeStateMatch.getCompositeState(), subregionList);
+			setAllRegionsWithSync(false, subregionList);			
 		}
 	}
 	
