@@ -166,8 +166,26 @@ public class CommandHandler extends AbstractHandler {
 	private void createVariables() throws IncQueryException {
 		// Lekérjük a változó definiciókat
 		Collection<VariableDefinitionsMatch> allVariableDefinitions = matcher.getAllVariables();
+		System.out.println(allVariableDefinitions.size());
 		for (VariableDefinitionsMatch variableMatch : allVariableDefinitions) {
-			builder.addGlobalDeclaration(UppaalCodeGenerator.transformVariable(variableMatch.getVariable()));
+			String expression = "";
+			if (variableMatch.getIsReadonly()) {
+				expression = expression + "const ";
+			}
+			if (variableMatch.getType().getName() == "integer") { 
+				expression = expression + "int ";
+			}
+			else if (variableMatch.getType().getName() == "boolean") {
+				expression = expression + "bool ";
+			}
+			expression = expression + variableMatch.getName() + " ";
+			if (variableMatch.getVariable().getInitialValue() == null) {
+				expression = expression + ";";
+				builder.addGlobalDeclaration(expression);
+			}
+			else {
+				builder.addGlobalDeclaration(expression + "=" + UppaalCodeGenerator.transformExpression(variableMatch.getVariable().getInitialValue()) + ";");
+			}			
 		}
 	}
 	
@@ -182,7 +200,7 @@ public class CommandHandler extends AbstractHandler {
 		for (RegionsMatch regionMatch : regionMatches) {
 			Template template = null;			
 			// Kiszedjük a template nevekbõl a szóközöket, mert az UPPAAL nem szereti
-			if (regionMatch.getRegion().getComposite() instanceof Statechart) {
+			if (isTopRegion(regionMatch.getRegion())) {
 				template = builder.createTemplate(regionMatch.getRegionName().replaceAll(" ", "") + "OfStatechart");
 				// Mégis foglalkozunk, hogy a regionökön átívelõ tranziciók helyes lefutása garantálható legyen
 				builder.addLocalDeclaration("bool " + isValidVar + " = true;", template);
@@ -201,7 +219,7 @@ public class CommandHandler extends AbstractHandler {
 			template.setInit(entryLocation);
 			builder.setLocationComment(entryLocation, "Initial entry node");
 			// Az entry node legfelsõ szinten committed, alsóbb szinteken urgent, hogy ne legyen baj a deadlock-kal, ha committed állapotól kijövõ éleken van guard
-			if (regionMatch.getRegion().getComposite() instanceof Statechart) {
+			if (isTopRegion(regionMatch.getRegion())) {
 				builder.setLocationCommitted(entryLocation);		
 			}
 			else {
@@ -265,10 +283,10 @@ public class CommandHandler extends AbstractHandler {
 			if (stateMatch.getParentRegion() == region) {										
 				Location aLocation = builder.createLocation(stateMatch.getName(), template);
 				stateLocationMap.put(stateMatch.getState(), aLocation); // A state-location párokat betesszük a map-be	
-				if (stateMatch.getState().isComposite()) {
+				if (isCompositeState(stateMatch.getState())) {
 					builder.setLocationComment(aLocation, "Composite state");
 				}
-				if (stateMatch.getState().isSimple()) {
+				else {
 					builder.setLocationComment(aLocation, "Simple state");
 				}
 			}									
@@ -367,25 +385,25 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
-	 * Ez a metódus létrehozza az UPPAAL edge-eket a Yakindu transition-ök alapján a SourceAndTargetOfTransitionsMatcheket felhasználva.
+	 * Ez a metódus létrehozza az UPPAAL edge-eket az azonos regionbeli Yakindu transition-ök alapján az EdgesInSameRegionMatcheket felhasználva.
 	 * @param region A Yakindu region, amelybõl a transitionök valók.
 	 * @param template Az UPPAAL template, amelybe az edgeket kell rakni.
 	 * @throws IncQueryException
 	 */
 	private void createEdges(Region region, Template template) throws IncQueryException {
 		//Lekérjük a transition match-eket		
-		Collection<SourceAndTargetOfTransitionsMatch> allTransitionMatches = matcher.getAllTransitions();	
+		Collection<EdgesInSameRegionMatch> edgesInSameRegionMatches = matcher.getAllEdgesInSameRegion();	
 		// Megnézzük a transition match-eket és létrehozzuk az edge-eket a megfelelõ guardokkal és effectekkel
-		for (SourceAndTargetOfTransitionsMatch transitionMatch : allTransitionMatches) {											
+		for (EdgesInSameRegionMatch edgesInSameRegionMatch : edgesInSameRegionMatches) {											
 			// Ha a két végpont a helyes region-ben van
-			if (transitionMatch.getSource().getParentRegion() == region && transitionMatch.getTarget().getParentRegion() == region 
-					&& stateLocationMap.containsKey(transitionMatch.getSource()) && stateLocationMap.containsKey(transitionMatch.getTarget())) {								
+			if (edgesInSameRegionMatch.getParentRegion() == region &&
+					stateLocationMap.containsKey(edgesInSameRegionMatch.getSource()) && stateLocationMap.containsKey(edgesInSameRegionMatch.getTarget())) {								
 				//Létrehozunk egy edge-t
 				Edge anEdge = builder.createEdge(template); 
 				//Beállítjuk az edge forrását és célját
-				anEdge.setSource(stateLocationMap.get(transitionMatch.getSource()));
-				anEdge.setTarget(stateLocationMap.get(transitionMatch.getTarget()));
-				transitionEdgeMap.put(transitionMatch.getTransition(), anEdge);
+				anEdge.setSource(stateLocationMap.get(edgesInSameRegionMatch.getSource()));
+				anEdge.setTarget(stateLocationMap.get(edgesInSameRegionMatch.getTarget()));
+				transitionEdgeMap.put(edgesInSameRegionMatch.getTransition(), anEdge);
 			}				
 		}
 	}
@@ -397,25 +415,21 @@ public class CommandHandler extends AbstractHandler {
 	 */
 	private void createEntryForCompositeStates() throws IncQueryException {
 		// Lekérjük az állapotokat
-		Collection<StatesMatch> allStateMatches = matcher.getAllStates();
+		Collection<CompositeStatesMatch> allCompositeStatesMatches = matcher.getAllCompositeStates();
 		// Megnézzük a state matcheket és létrehozzuk az entry locationöket
-		for (StatesMatch stateMatch : allStateMatches) {				
-			State state = stateMatch.getState();
-			// Csak akkor veszünk fel entry locationt, ha a state composite
-			if (state.isComposite()) {
-				// Létrehozzuk a locationt, majd a megfelelõ éleket a megfelelõ location-ökbe kötjük
-				Location stateEntryLocation = builder.createLocation("CompositeStateEntry", regionTemplateMap.get(state.getParentRegion()));
-				builder.setLocationCommitted(stateEntryLocation);
-				Edge entryEdge = builder.createEdge(regionTemplateMap.get(state.getParentRegion()));
-				builder.setEdgeSource(entryEdge, stateEntryLocation);
-				builder.setEdgeTarget(entryEdge, stateLocationMap.get(state));
-				// Berakjuk a state-edge párt a map-be
-				hasEntryLoc.put(state, entryEdge);
-				// Átállítjuk a bejövõ élek targetjét
-				for (Transition transition : transitionEdgeMap.keySet()) {
-					if (state.getIncomingTransitions().contains(transition)) {
-						transitionEdgeMap.get(transition).setTarget(stateEntryLocation);
-					}
+		for (CompositeStatesMatch compositeStateMatch : allCompositeStatesMatches) {				
+			// Létrehozzuk a locationt, majd a megfelelõ éleket a megfelelõ location-ökbe kötjük
+			Location stateEntryLocation = builder.createLocation("CompositeStateEntry", regionTemplateMap.get(compositeStateMatch.getParentRegion()));
+			builder.setLocationCommitted(stateEntryLocation);
+			Edge entryEdge = builder.createEdge(regionTemplateMap.get(compositeStateMatch.getParentRegion()));
+			builder.setEdgeSource(entryEdge, stateEntryLocation);
+			builder.setEdgeTarget(entryEdge, stateLocationMap.get(compositeStateMatch.getCompositeState()));
+			// Berakjuk a state-edge párt a map-be
+			hasEntryLoc.put(compositeStateMatch.getCompositeState(), entryEdge);
+			// Átállítjuk a bejövõ élek targetjét, ehhez felhasználjuk az összes élet lekérdezõ metódust
+			for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : matcher.getAllTransitions()) {
+				if (sourceAndTargetOfTransitionsMatch.getTarget() == compositeStateMatch.getCompositeState()) {
+					transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()).setTarget(stateEntryLocation);
 				}
 			}
 		}
@@ -427,43 +441,47 @@ public class CommandHandler extends AbstractHandler {
 	 * @throws IncQueryException
 	 */
 	private void createEntryEdgesForAbstractionLevels() throws IncQueryException {
-		// Lekérjük az állapotokat
-		Collection<StatesMatch> allStateMatches = matcher.getAllStates();
-		// Megnézzük az összes state matchet
-		for (StatesMatch stateMatch : allStateMatches) {				
-			State state = stateMatch.getState();
-			if (state.isComposite()) {
+		// Lekérjük a composite állapotokat
+		Collection<CompositeStatesMatch> allCompositeStatesMatches = matcher.getAllCompositeStates();
+		// Megnézzük a state matcheket és létrehozzuk az entry locationöket
+		for (CompositeStatesMatch compositeStateMatch : allCompositeStatesMatches) { {
 				builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
-				Edge entryEdge = hasEntryLoc.get(state);
+				Edge entryEdge = hasEntryLoc.get(compositeStateMatch.getCompositeState());
 				builder.setEdgeSync(entryEdge, syncChanVar + (syncChanId), true);
 				// Minden eggyel alatti régióban létrehozzuk a szükséges ? sync-eket
-				for (Region subregion : state.getRegions()) {
-					// Ha van historyja: önmagába (vagy composite-nál az entryLocationbe) kötjük
-					if (getEntryOfRegion(subregion).getKind().getValue() != 0 || hasDeepHistoryAbove(subregion)) {
-						for (Vertex vertex : subregion.getVertices()) {
-							// Csak ha nem choice
-							if (!(vertex instanceof Choice)) {
-								Edge toItselfEdge = builder.createEdge(regionTemplateMap.get(subregion));
-								builder.setEdgeSync(toItselfEdge, syncChanVar + syncChanId, false);
-								builder.setEdgeUpdate(toItselfEdge, isValidVar + " = true");
-								builder.setEdgeSource(toItselfEdge, stateLocationMap.get(vertex));
-								if (hasEntryLoc.containsKey(vertex)) {	
-									builder.setEdgeTarget(toItselfEdge, hasEntryLoc.get(vertex).getSource());
-								}
-								else {
-									builder.setEdgeTarget(toItselfEdge, stateLocationMap.get(vertex));
+				for (RegionsOfCompositeStatesMatch regionsOfCompositeStatesMatch : matcher.getAllRegionsOfCompositeStates()) {
+					if (regionsOfCompositeStatesMatch.getCompositeState() == compositeStateMatch.getCompositeState()) {
+						// Ha van historyja: önmagába (vagy composite-nál az entryLocationbe) kötjük
+						if (getEntryOfRegion(regionsOfCompositeStatesMatch.getSubregion()).getKind().getValue() != 0 || hasDeepHistoryAbove(regionsOfCompositeStatesMatch.getSubregion())) {
+							for (VerticesOfRegionsMatch verticesOfRegionMatch : matcher.getAllVerticesOfRegions()) {
+								if (verticesOfRegionMatch.getRegion() == regionsOfCompositeStatesMatch.getSubregion()) {
+									// Csak ha nem choice
+									if (!(isChoice(verticesOfRegionMatch.getVertex()))) {
+										Edge toItselfEdge = builder.createEdge(regionTemplateMap.get(verticesOfRegionMatch.getRegion()));
+										builder.setEdgeSync(toItselfEdge, syncChanVar + syncChanId, false);
+										builder.setEdgeUpdate(toItselfEdge, isValidVar + " = true");
+										builder.setEdgeSource(toItselfEdge, stateLocationMap.get(verticesOfRegionMatch.getVertex()));
+										if (hasEntryLoc.containsKey(verticesOfRegionMatch.getVertex())) {	
+											builder.setEdgeTarget(toItselfEdge, hasEntryLoc.get(verticesOfRegionMatch.getVertex()).getSource());
+										}
+										else {
+											builder.setEdgeTarget(toItselfEdge, stateLocationMap.get(verticesOfRegionMatch.getVertex()));
+										}
+									}
 								}
 							}
 						}
-					}
-					// Ha nincs historyja: region entry-be kötjük
-					else {
-						for (Vertex vertex : subregion.getVertices()) {
-							Edge toEntryEdge = builder.createEdge(regionTemplateMap.get(subregion));
-							builder.setEdgeSync(toEntryEdge, syncChanVar + syncChanId, false);
-							builder.setEdgeUpdate(toEntryEdge, isValidVar + " = true");
-							builder.setEdgeSource(toEntryEdge, stateLocationMap.get(vertex));
-							builder.setEdgeTarget(toEntryEdge, stateLocationMap.get(getEntryOfRegion(subregion)));
+						// Ha nincs historyja: region entry-be kötjük
+						else {
+							for (VerticesOfRegionsMatch verticesOfRegionMatch : matcher.getAllVerticesOfRegions()) {
+								if (verticesOfRegionMatch.getRegion() == regionsOfCompositeStatesMatch.getSubregion()) {
+									Edge toEntryEdge = builder.createEdge(regionTemplateMap.get(verticesOfRegionMatch.getRegion()));
+									builder.setEdgeSync(toEntryEdge, syncChanVar + syncChanId, false);
+									builder.setEdgeUpdate(toEntryEdge, isValidVar + " = true");
+									builder.setEdgeSource(toEntryEdge, stateLocationMap.get(verticesOfRegionMatch.getVertex()));
+									builder.setEdgeTarget(toEntryEdge, stateLocationMap.get(getEntryOfRegion(verticesOfRegionMatch.getRegion())));
+								}
+							}
 						}
 					}
 				}
@@ -843,6 +861,33 @@ public class CommandHandler extends AbstractHandler {
 		else {		
 			return getThisAndUpperRegions(regionList, ((State) region.getComposite()).getParentRegion());
 		}
+	}
+	
+	private boolean isTopRegion(Region region) throws IncQueryException {
+		for (TopRegionsMatch topRegionMatch : matcher.getTopRegions()) {
+			if (topRegionMatch.getRegion() == region) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	private boolean isCompositeState(Vertex vertex) throws IncQueryException {
+		for (CompositeStatesMatch compositeStatesMatch : matcher.getAllCompositeStates()) {
+			if (compositeStatesMatch.getCompositeState() == vertex) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	private boolean isChoice(Vertex vertex) throws IncQueryException {
+		for (ChoicesMatch choicesMatch : matcher.getAllChoices()) {
+			if (choicesMatch.getChoice() == vertex) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 }

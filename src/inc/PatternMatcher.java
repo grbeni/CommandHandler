@@ -24,7 +24,10 @@ public class PatternMatcher {
 			e.printStackTrace();
 		}
 	}
-
+	
+	// Így kéne talán felépíteni
+	// Beni mutatta
+	
 	public SatechartToStateNameMatch getStateName(Statechart chart)
 			throws IncQueryException {
 		Collection<SatechartToStateNameMatch> allMatches = SatechartToStateNameMatcher
@@ -37,8 +40,6 @@ public class PatternMatcher {
 		return null;
 	}
 
-// Így kéne talán felépíteni
-// Beni mutatta
 	public String getEntryName() throws IncQueryException {
 		Collection<GetEntryMatch> matches = GetEntryMatcher.on(engine).getAllMatches();
 		for (GetEntryMatch match : matches) {
@@ -79,6 +80,10 @@ public class PatternMatcher {
 		return RegionsMatcher.on(engine).getAllMatches();
 	}
 	
+	public Collection<TopRegionsMatch> getTopRegions() throws IncQueryException {
+		return TopRegionsMatcher.on(engine).getAllMatches();
+	}
+	
 	public Collection<ChoicesMatch> getAllChoices() throws IncQueryException {
 		return ChoicesMatcher.on(engine).getAllMatches();
 	}
@@ -98,5 +103,41 @@ public class PatternMatcher {
 	public Collection<ExitNodesMatch> getAllExitNodes() throws IncQueryException {
 		return ExitNodesMatcher.on(engine).getAllMatches();
 	}
-		
+	
+	public Collection<EdgesInSameRegionMatch> getAllEdgesInSameRegion() throws IncQueryException {
+		return EdgesInSameRegionMatcher.on(engine).getAllMatches();
+	}
+	
+	public Collection<EdgesAcrossRegionsMatch> getAllEdgesAcrossRegions() throws IncQueryException {
+		return EdgesAcrossRegionsMatcher.on(engine).getAllMatches();
+	}
+	
+	public Collection<CompositeStatesMatch> getAllCompositeStates() throws IncQueryException {
+		return CompositeStatesMatcher.on(engine).getAllMatches();
+	}
+	
+	public Collection<RegionsOfCompositeStatesMatch> getAllRegionsOfCompositeStates() throws IncQueryException {
+		return RegionsOfCompositeStatesMatcher.on(engine).getAllMatches();
+	}
+	
+	public Collection<VerticesOfRegionsMatch> getAllVerticesOfRegions() throws IncQueryException {
+		return VerticesOfRegionsMatcher.on(engine).getAllMatches();
+	} 
+	
+	public Collection<EdgesWithEffectMatch> getAllEdgesWithEffect() throws IncQueryException {
+		return EdgesWithEffectMatcher.on(engine).getAllMatches();
+	}
+	
+	public Collection<EdgesWithGuardMatch> getAllEdgesWithGuard() throws IncQueryException {
+		return EdgesWithGuardMatcher.on(engine).getAllMatches();
+	}
+	
+	public Collection<StatesWithEntryEventMatch> getAllStatesWithEntryEvent() throws IncQueryException {
+		return StatesWithEntryEventMatcher.on(engine).getAllMatches();
+	}
+	
+	public Collection<StatesWithExitEventMatch> getAllStatesWithExitEvent() throws IncQueryException {
+		return StatesWithExitEventMatcher.on(engine).getAllMatches();
+	}
+	
 }

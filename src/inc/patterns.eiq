@@ -6,62 +6,72 @@ import "http://www.yakindu.org/sct/statechart/SGen"
 import "http://www.yakindu.org/sct/sgraph/2.0.0"
 import "http://www.yakindu.org/base/base/2.0.0"
 import "http://www.yakindu.org/sct/statechart/SText"
+import epackage "http://www.yakindu.org/base/expressions/Expressions"
 
-// Choice-ok lekérése
-pattern choices(choice, region) {
-	Choice.parentRegion(choice, region);
-}
-
-// Változók lekérése
-pattern variableDefinitions(variable, isConst, name) {
-	VariableDefinition.const(variable, isConst);
-	VariableDefinition.name(variable, name);
-}
-
-// Region-ök lekérése
-pattern regions(regionName, region, entry) {
-	Region.name(region, regionName);
-	Entry.parentRegion(entry, region);
-}
 
 // Beni patternje
-pattern SatechartToStateName(stateChart, name, state, region) {
+pattern SatechartToStateName(stateChart : Statechart, name, state : State, region : Region) {
 	Statechart.regions.vertices(stateChart, state);
 	State.name(state, name);
 	State.parentRegion(state, region);
 }
 
-// Visszaadja az összes state-et a parentRegionjével és nevével
+
+// Beni patternje
+pattern getEntry(region : Region, entry : Entry, name) {
+	Region.vertices.name(region, name);
+	Entry.name(entry, name);
+}
+
+// Változók lekérése
+pattern variableDefinitions(variable : VariableDefinition, name, isReadonly, type) {
+	VariableDefinition.name(variable, name);
+	VariableDefinition.readonly(variable, isReadonly);
+	VariableDefinition.type(variable, type);
+}
+
+// Region-ök lekérése Entry-jükkel
+pattern regions(regionName, region : Region, entry : Entry) {
+	Region.name(region, regionName);
+	Entry.parentRegion(entry, region);
+}
+
+// Legfelsõ szintû regionök lekérése
+pattern topRegions(region : Region) {
+	Statechart.regions(_statechart, region);	
+}
+
+// State-ek lekérése a parentRegionjével és nevével
 pattern states(state : State, parentRegion : Region, name) {
 	State.parentRegion(state, parentRegion);
 	State.name(state, name);
 }
 
-// Beni patternje
-pattern getEntry(region, entry, name) {
-	Region.vertices.name(region, name);
-	Entry.name(entry, name);
-}
-
-// Visszaadja az exit node-okat és parentRegionjüket
-pattern exitNodes(exit, region) {
-	Exit.parentRegion(exit, region);
-}
-
-pattern sourceAndTargetOfTransitions(transition, source, target) {
+// Transitionök lekérése source-ukkal és targetjükkel
+pattern sourceAndTargetOfTransitions(transition : Transition, source : Vertex, target : Vertex) {
 	Transition.source(transition, source);
 	Transition.target(transition, target);
 }
 
+// Choice-ok lekérése parentRegionükkel
+pattern choices(choice : Choice, region : Region) {
+	Choice.parentRegion(choice, region);
+}
+
+// Exit node-ok lekérése a parentRegionjüket
+pattern exitNodes(exit : Exit, region : Region) {
+	Exit.parentRegion(exit, region);
+}
+
 // Final state-ek lekérése
-pattern finalStates(finalState, region) {
+pattern finalStates(finalState : FinalState, region : Region) {
 	FinalState.parentRegion(finalState, region);
 }
 
 // Összetettebb patternek, amelyeket késõbb hoztam létre
 
 // Azonos regionben lévõ vertexek közötti transitionöket adja vissza
-pattern edgesInSameRegion(transition : Transition, source : Vertex, target : Vertex) {
+pattern edgesInSameRegion(transition : Transition, source : Vertex, target : Vertex, parentRegion : Region) {
 	Transition.source(transition, source);
 	Transition.target(transition, target);
 	Transition.source.parentRegion(transition, parentRegion);
@@ -69,7 +79,6 @@ pattern edgesInSameRegion(transition : Transition, source : Vertex, target : Ver
 }
 
 // Különbözõ regionben lévõ vertexek közötti transitionöket adja vissza
-// Hogy lehet megmondani, hogy a két régió különbözzön?
 pattern edgesAcrossRegions(transition : Transition, source : Vertex, target : Vertex) {
 	Transition.source(transition, source);
 	Transition.target(transition, target);
@@ -79,48 +88,62 @@ pattern edgesAcrossRegions(transition : Transition, source : Vertex, target : Ve
 }
 
 // Composite state-eket adja vissza
-pattern compositeStates(compositeState : State, name) {
-	State.composite(compositeState, true);
+pattern compositeStates(compositeState : State, parentRegion : Region, name) {
+	State.regions(compositeState, _region);
 	State.name(compositeState, name);
+	State.parentRegion(compositeState, parentRegion);
+}
+
+// Composite state-ek alrégióit adja vissza
+pattern regionsOfCompositeStates(compositeState : State, parentRegion : Region, name, subregion : Region) {
+	find compositeStates(compositeState, parentRegion, name);
+	State.regions(compositeState, subregion);
+}
+
+pattern verticesOfRegions(vertex : Vertex, region : Region) {
+	Region.vertices(region, vertex);
+}
+
+// A ReactionEffectek Expressionjeit adja vissza
+pattern reactionEffectToExpression(reactionEffect : ReactionEffect, expression : Expression) {
+	ReactionEffect.actions(reactionEffect, expression);
 }
 
 // Az ReactionEffecttel rendelkezõ transitionöket aadja vissza
-pattern edgesWithEffect(transition : Transition, effect : ReactionEffect) {
+pattern edgesWithEffect(transition : Transition, effect : ReactionEffect, expression : Expression) {
 	Transition.effect(transition, effect);
 	ReactionEffect(effect);
+	find reactionEffectToExpression(effect, expression);
 }
 
 // Az EntryEventtel rendelkezõ state-ek effectjét adja vissza
-pattern statesWithEntryEvent(state : State, effect : ReactionEffect) {
+pattern statesWithEntryEvent(state : State, /*effect : ReactionEffect,*/ expression : Expression) {
 	State.localReactions(state, reaction);
 	Reaction.trigger(reaction, trigger);
 	ReactionTrigger.triggers(trigger, entryEvent);
 	EntryEvent(entryEvent);
 	Reaction.effect(reaction, effect);
-	ReactionEffect(effect);
+	find reactionEffectToExpression(effect, expression);
 }
 
 // Az ExitEventtel rendelkezõ state-ek effectjét adja vissza
-pattern statesWithExitEvent(state : State, effect : ReactionEffect) {
+pattern statesWithExitEvent(state : State,/*effect : ReactionEffect,*/ expression : Expression) {
 	State.localReactions(state, reaction);
 	Reaction.trigger(reaction, trigger);
 	ReactionTrigger.triggers(trigger, exitEvent);
 	ExitEvent(exitEvent);
 	Reaction.effect(reaction, effect);
-	ReactionEffect(effect);
+	find reactionEffectToExpression(effect, expression);
 }
 
-// A ReactionEffectek Expressionjeit adja vissza
-pattern reactionEffectToExpression(reactionEffect : ReactionEffect, expression) {
-	ReactionEffect.actions(reactionEffect, expression);
-}
-
-pattern guardToExpression(guard : Guard, expression) {
+// Guardok expression-jeit adja vissza
+pattern guardToExpression(guard : Guard, expression : Expression) {
 	Guard.expression(guard, expression);
 }
 
 // A guarddal rendelkezõ transitionöket adja vissza
-pattern edgesWithGuard(transition : Transition, guard : Guard) {
+pattern edgesWithGuard(transition : Transition, guard : Guard, expression : Expression) {
 	Transition.trigger(transition, trigger);
 	ReactionTrigger.guard(trigger, guard);
+	find guardToExpression(guard, expression);
 }

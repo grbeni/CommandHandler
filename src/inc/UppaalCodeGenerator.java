@@ -26,42 +26,6 @@ import org.yakindu.sct.model.stext.stext.ReactionTrigger;
 import org.yakindu.sct.model.stext.stext.VariableDefinition;
 
 public class UppaalCodeGenerator {
-
-	/**
-	 * A változó definiciókat létrehozó metódus.
-	 * 
-	 * @param variable Yakindu VariableDefinition, amely változó definiciót tartalmaz.
-	 * @return Egy string, amely tartalmazza a változó definicióját.
-	 */
-	public static String transformVariable(VariableDefinition variable) {
-		// Leírom a változó típusát és nevét
-		if (variable == null) {
-			return "";
-		}
-		String expression = "";
-		if (variable.isConst()) {
-			expression = "const " + expression;
-		}
-		if (variable.getType().getName().equals("boolean")) {
-			expression = "bool";
-		} else if (variable.getType().getName().equals("integer")) {
-			expression = "int";
-		}
-		expression = expression + " " + variable.getName();
-
-		// Ha nincsen inicializáció, visszaadom a deklarációt
-		if (variable.getInitialValue() == null) {
-			return expression + ";";
-		}
-		// Különben hozzáteszek még egy értékadó operátort
-		else {
-			expression = expression + " =";
-		}
-		// Stringgé transzformálom a kifejezést, majd visszaadom
-		expression = expression
-				+ transformExpression(variable.getInitialValue());
-		return expression + ";";
-	}
 	
 	/**
 	 * A Yakindu ReactionEffecteket UPPAAL szabályoknak megfelelõ string effectté transzformáló metódus.
@@ -106,11 +70,14 @@ public class UppaalCodeGenerator {
 	 * @param expression A Yakindu expression, amelyet transzformálni kell.
 	 * @return Egy string, amely a transzformált kifejezést tartalmazza, UPPAAL szabályoknak megfelelõen.
 	 */
-	private static String transformExpression(Expression expression) {
+	public static String transformExpression(Expression expression) {
+		if (expression == null) {
+			return "";
+		}
 		// Ha a kifejezés egy egyoperandusú numerikus kifejezéssel kezdõdik, akkor leírom
 		// az operátort, majd letranszformálom a maradék kifejezést is.
 		// Visszaadom, amit kaptam.
-		if (expression instanceof NumericalUnaryExpression) {
+		else if (expression instanceof NumericalUnaryExpression) {
 			NumericalUnaryExpression NUExpression = (NumericalUnaryExpression) expression;
 			switch (NUExpression.getOperator().getValue()) {
 			case 0:
