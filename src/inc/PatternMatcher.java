@@ -76,11 +76,11 @@ public class PatternMatcher {
 		return SourceAndTargetOfTransitionsMatcher.on(engine).getAllMatches();
 	}
 	
-	public Collection<RegionsMatch> getRegions() throws IncQueryException {
-		return RegionsMatcher.on(engine).getAllMatches();
+	public Collection<EntryOfRegionsMatch> getAllRegionsWithEntry() throws IncQueryException {
+		return EntryOfRegionsMatcher.on(engine).getAllMatches();
 	}
 	
-	public Collection<TopRegionsMatch> getTopRegions() throws IncQueryException {
+	public Collection<TopRegionsMatch> getAllTopRegions() throws IncQueryException {
 		return TopRegionsMatcher.on(engine).getAllMatches();
 	}
 	
