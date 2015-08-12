@@ -3,6 +3,7 @@ package inc;
 import java.util.Collection;
 
 import org.eclipse.incquery.runtime.api.IncQueryEngine;
+import org.eclipse.incquery.runtime.api.impl.RunOnceQueryEngine;
 import org.eclipse.incquery.runtime.exception.IncQueryException;
 import org.yakindu.sct.model.sgraph.Entry;
 import org.yakindu.sct.model.sgraph.Region;
@@ -12,14 +13,17 @@ import de.uni_paderborn.uppaal.templates.Location;
 
 public class PatternMatcher {
 
-	private static IncQueryEngine engine = null;
-
 	private static org.eclipse.emf.ecore.resource.Resource resource = null;
 
+	private static IncQueryEngine engine = null;
+	
+	private static RunOnceQueryEngine runOnceEngine = null;
+
 	public void setResource(org.eclipse.emf.ecore.resource.Resource res) {
-		resource = res;
 		try {
+			resource = res;
 			engine = IncQueryEngine.on(res);
+			runOnceEngine = new RunOnceQueryEngine(res);
 		} catch (IncQueryException e) {
 			e.printStackTrace();
 		}
@@ -133,11 +137,13 @@ public class PatternMatcher {
 	}
 	
 	public Collection<StatesWithEntryEventMatch> getAllStatesWithEntryEvent() throws IncQueryException {
-		return StatesWithEntryEventMatcher.on(engine).getAllMatches();
+		//return StatesWithEntryEventMatcher.on(engine).getAllMatches();
+		return runOnceEngine.getAllMatches(StatesWithEntryEventMatcher.querySpecification());
 	}
 	
 	public Collection<StatesWithExitEventMatch> getAllStatesWithExitEvent() throws IncQueryException {
-		return StatesWithExitEventMatcher.on(engine).getAllMatches();
+		//return StatesWithExitEventMatcher.on(engine).getAllMatches();
+		return runOnceEngine.getAllMatches(StatesWithExitEventMatcher.querySpecification());
 	}
 	
 }

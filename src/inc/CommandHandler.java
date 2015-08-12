@@ -275,6 +275,9 @@ public class CommandHandler extends AbstractHandler {
 		
 		// Edge guardok berakása
 		setEdgeGuards();		
+		
+		// Template guardok berakása
+		createTemplateValidityGuards();
 	}
 	
 	/**
@@ -681,6 +684,15 @@ public class CommandHandler extends AbstractHandler {
 			builder.setEdgeTarget(abstractionEdge, stateLocationMap.get(target));
 			builder.setEdgeSync(abstractionEdge, syncChanVar + (syncChanId), true);
 			builder.setEdgeComment(abstractionEdge, "A Yakinduban alacsonyabb absztrakcios szinten levo vertexbe vezeto el.");
+			// Ha a targetnek van entryEventje, akkor azt rá kell írni az élre
+			if (hasEntryEvent(target)) {
+				for (StatesWithEntryEventMatch statesWithEntryEventMatch : matcher.getAllStatesWithEntryEvent()) {
+					if (statesWithEntryEventMatch.getState() == target) {
+						String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
+						builder.setEdgeUpdate(abstractionEdge, effect);
+					}
+				}
+			}
 			// Ez az él felel majd meg a regionökön átívelõ transitionnek
 			transitionEdgeMap.put(transition, abstractionEdge);
 			// Ha a target composite state, akkor belépésre minden alrégiójába is belépünk
@@ -695,8 +707,17 @@ public class CommandHandler extends AbstractHandler {
 			for (VerticesOfRegionsMatch verticesOfRegionsMatch : matcher.getAllVerticesOfRegions()) {
 				if (verticesOfRegionsMatch.getRegion() == target.getParentRegion()) {
 					Edge syncEdge = builder.createEdge(regionTemplateMap.get(verticesOfRegionsMatch.getRegion()));
-					builder.setEdgeSource(syncEdge, stateLocationMap.get(verticesOfRegionsMatch.getVertex()));				
-					builder.setEdgeTarget(syncEdge, stateLocationMap.get(target));				
+					builder.setEdgeSource(syncEdge, stateLocationMap.get(verticesOfRegionsMatch.getVertex()));
+					builder.setEdgeTarget(syncEdge, stateLocationMap.get(target));	
+					// Ha a targetnek van entryEventje, akkor azt rá kell írni az élre
+					if (hasEntryEvent(target)) {
+						for (StatesWithEntryEventMatch statesWithEntryEventMatch : matcher.getAllStatesWithEntryEvent()) {
+							if (statesWithEntryEventMatch.getState() == target) {
+								String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
+								builder.setEdgeUpdate(syncEdge, effect);
+							}
+						}
+					}
 					builder.setEdgeSync(syncEdge, syncChanVar + (syncChanId), false);
 					builder.setEdgeUpdate(syncEdge, isValidVar + " = true");		
 				}
@@ -758,15 +779,13 @@ public class CommandHandler extends AbstractHandler {
 	
 	/**
 	 * Ez a metódus létrehozza az UPPAAL edge-eken az update-eket a Yakindu effectek alapján.
+	 * @throws IncQueryException 
 	 */
-	private void setEdgeUpdates() {
-		// Végigmegyünk minden transition-ön
-		for (Transition transition : transitionEdgeMap.keySet()) {		
-			// Ha van effectje, akkor azt transzformáljuk, és ráírjuk az edge-re
-			if ((transition.getEffect() != null) && (transition.getEffect() instanceof ReactionEffect)) {
-				String effect = UppaalCodeGenerator.transformEffect((ReactionEffect) transition.getEffect());
-				builder.setEdgeUpdate(transitionEdgeMap.get(transition), effect);
-			}
+	private void setEdgeUpdates() throws IncQueryException {
+		// Végigmegyünk minden transition-ön, amelynek van effectje
+		for (EdgesWithEffectMatch edgesWithEffectMatch : matcher.getAllEdgesWithEffect()) {
+			String effect = UppaalCodeGenerator.transformExpression(edgesWithEffectMatch.getExpression());
+			builder.setEdgeUpdate(transitionEdgeMap.get(edgesWithEffectMatch.getTransition()), effect);
 		}
 		// Megcsiáljuk a state update-eket is
 		setEdgeUpdatesFromStates();
@@ -778,95 +797,75 @@ public class CommandHandler extends AbstractHandler {
 	 * amelybõl a kivezetõ él a megfelelõ locationba vezet, és tartalmazza a szükséges update-eket.
 	 * Minden Exit triggerrel rendelkezõ state esetén a kimenõ élekre rakja rá a szükséges update-eket.
 	 * Könnyen belátható, hogy Exit esetén nem mûködne az Entry-s megoldás.
+	 * @throws IncQueryException 
 	 */
-	private void setEdgeUpdatesFromStates() {
-		// Végigmegyünk minden vertex-en
-		for (Vertex vertex : stateLocationMap.keySet()) {
-			// Ha a vertex egy state, akkor lehetnek  local reaction-jei
-			if (vertex instanceof State) {
-				State state = (State) vertex;
-				// Végigmegyünk minden reaction-ön
-				for (Reaction reaction : state.getLocalReactions()) {
-					// Ha ReactionEffect, akkor azt ráírjuk minden bejövõ Edge-re
-					if ((reaction.getTrigger() instanceof ReactionTrigger) && (reaction.getEffect() instanceof ReactionEffect)) {
-						ReactionTrigger reactionTrigger = (ReactionTrigger) reaction.getTrigger();
-						// Ha Entry, akkor létrehozunk egy committed állapotot, amelybõl egy élet vezetünk a megfelelõ location-bea megfelelõ update-tel
-						if (reactionTrigger.getTriggers().get(0) instanceof EntryEvent) {
-							// Transzformáljuk a kifejezést
-							String effect = UppaalCodeGenerator.transformEffect((ReactionEffect) reaction.getEffect());
-							// Ha nincs még entry state-je
-							if (!hasEntryLoc.containsKey(state)) {
-								// Létrehozzuk a locationt, majd a megfelelõ éleket a megfelelõ location-ökbe kötjük
-								Location stateEntryLocation = builder.createLocation("StateEntryLocation" + (entryStateId++), regionTemplateMap.get(state.getParentRegion()));
-								builder.setLocationCommitted(stateEntryLocation);
-								Edge entryEdge = builder.createEdge(regionTemplateMap.get(state.getParentRegion()));
-								builder.setEdgeSource(entryEdge, stateEntryLocation);
-								builder.setEdgeTarget(entryEdge, stateLocationMap.get(state));
-								builder.setEdgeUpdate(entryEdge, effect);
-								// Átállítjuk a bejövõ élek targetjét
-								for (Transition transition : transitionEdgeMap.keySet()) {
-									if (state.getIncomingTransitions().contains(transition)) {
-										transitionEdgeMap.get(transition).setTarget(stateEntryLocation);
-									}
-								}	
-							}
-							// Ha már van entry state-je
-							else {
-								builder.setEdgeUpdate(hasEntryLoc.get(state), effect);
-							}
-						}						
-						// Ha Exit, akkor ráírjuk az update-et minden kimenõ élre
-						// Nem használhatunk committed locationt
-						else if (reactionTrigger.getTriggers().get(0) instanceof ExitEvent) {
-							// Transzformáljuk a kifejezést
-							String effect = UppaalCodeGenerator.transformEffect((ReactionEffect) reaction.getEffect());				
-							// Nem hozhatunk létre egy új committed locationt
-							// Mégis ez a helyes, hiába nem annyira látványos
-							for (Transition transition : transitionEdgeMap.keySet()) {
-								if (state.getOutgoingTransitions().contains(transition)) {
-									builder.setEdgeUpdate(transitionEdgeMap.get(transition), effect);
-								}
-							}
-						}
+	private void setEdgeUpdatesFromStates() throws IncQueryException {
+		for (StatesWithEntryEventMatch statesWithEntryEventMatch : matcher.getAllStatesWithEntryEvent()) {
+			// Transzformáljuk a kifejezést
+			String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
+			// Ha nincs még entry state-je
+			if (!hasEntryLoc.containsKey(statesWithEntryEventMatch.getState())) {
+				// Létrehozzuk a locationt, majd a megfelelõ éleket a megfelelõ location-ökbe kötjük
+				Location stateEntryLocation = builder.createLocation("StateEntryLocation" + (entryStateId++), regionTemplateMap.get(statesWithEntryEventMatch.getParentRegion()));
+				builder.setLocationCommitted(stateEntryLocation);
+				Edge entryEdge = builder.createEdge(regionTemplateMap.get(statesWithEntryEventMatch.getParentRegion()));
+				builder.setEdgeSource(entryEdge, stateEntryLocation);
+				builder.setEdgeTarget(entryEdge, stateLocationMap.get(statesWithEntryEventMatch.getState()));
+				builder.setEdgeUpdate(entryEdge, effect);
+				hasEntryLoc.put(statesWithEntryEventMatch.getState(), entryEdge);
+				// Átállítjuk a bejövõ élek targetjét
+				for (EdgesInSameRegionMatch edgesInSameRegionMatch : matcher.getAllEdgesInSameRegion()) {
+					if (edgesInSameRegionMatch.getTarget() == statesWithEntryEventMatch.getState()) {
+						transitionEdgeMap.get(edgesInSameRegionMatch.getTransition()).setTarget(stateEntryLocation);
 					}
 				}
 			}
-		}		
+			// Ha már van entry state-je
+			else {
+				builder.setEdgeUpdate(hasEntryLoc.get(statesWithEntryEventMatch.getState()), effect);
+			}
+		}
+		// Ha Exit, akkor ráírjuk az update-et minden kimenõ élre
+		// Nem használhatunk committed locationt
+		for (StatesWithExitEventMatch statesWithExitEventMatch : matcher.getAllStatesWithExitEvent()) {
+			String effect = UppaalCodeGenerator.transformExpression(statesWithExitEventMatch.getExpression());			
+			builder.setEdgeUpdate(transitionEdgeMap.get(statesWithExitEventMatch.getTransition()), effect);			
+		}
 	}
 	
 	/**
 	 * Ez a metódus létrehozza az UPPAAL edge-eken az guardokat a Yakindu guardok alapján.
+	 * @throws IncQueryException 
 	 */
-	private void setEdgeGuards() {
+	private void setEdgeGuards() throws IncQueryException {
 		// Végigmegyünk minden transition-ön
-		for (Transition transition : transitionEdgeMap.keySet()) {
+		for (EdgesWithGuardMatch edgesWithGuardMatch : matcher.getAllEdgesWithGuard()) {
 			// Ha van guard-ja, akkor azt transzformáljuk, és ráírjuk az edge-re
-			if ((transition.getTrigger() != null) && (transition.getTrigger() instanceof ReactionTrigger)) {
-				String guard = UppaalCodeGenerator.transformGuard((ReactionTrigger) transition.getTrigger());
-				if (builder.getEdgeGuard(transitionEdgeMap.get(transition)) != null && builder.getEdgeGuard(transitionEdgeMap.get(transition)) != "") {
-					builder.setEdgeGuard(transitionEdgeMap.get(transition), builder.getEdgeGuard(transitionEdgeMap.get(transition)) + " && " + guard);
-				}
-				else {					
-					builder.setEdgeGuard(transitionEdgeMap.get(transition), guard);
-				}
+			String guard = UppaalCodeGenerator.transformExpression(edgesWithGuardMatch.getExpression());
+			if (builder.getEdgeGuard(transitionEdgeMap.get(edgesWithGuardMatch.getTransition())) != null && builder.getEdgeGuard(transitionEdgeMap.get(edgesWithGuardMatch.getTransition())) != "") {
+				builder.setEdgeGuard(transitionEdgeMap.get(edgesWithGuardMatch.getTransition()), builder.getEdgeGuard(transitionEdgeMap.get(edgesWithGuardMatch.getTransition())) + " && " + guard);
 			}
-			// Felrakjuk az érvényességi változókat is minden élre
-			createTemplateValidityGuards(transition);			
+			else {					
+				builder.setEdgeGuard(transitionEdgeMap.get(edgesWithGuardMatch.getTransition()), guard);
+			}		
 		}
 	}
 	
 	/**
 	 * Létrehozza a template-ek érvényes mûködéséhez szükséges guardokat. (isValid)
 	 * @param transition A Yakindu transition, amelynek a megfeleltetett UPPAAL élére rakjuk rá az érvényességi guardot.
+	 * @throws IncQueryException 
 	 */
-	private void createTemplateValidityGuards(Transition transition) {
-		// Rátesszük a guardokra a template érvényességi vátozót is
-		if (builder.getEdgeGuard(transitionEdgeMap.get(transition)) != null && builder.getEdgeGuard(transitionEdgeMap.get(transition)) != "") {
-			builder.setEdgeGuard(transitionEdgeMap.get(transition), isValidVar + " && " + builder.getEdgeGuard(transitionEdgeMap.get(transition)));
-		} 
-		else {
-			builder.setEdgeGuard(transitionEdgeMap.get(transition), isValidVar);
-		}			
+	private void createTemplateValidityGuards() throws IncQueryException {
+		for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : matcher.getAllTransitions()) {
+			// Rátesszük a guardokra a template érvényességi vátozót is
+			if (builder.getEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())) != null && builder.getEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())) != "") {
+				builder.setEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), isValidVar + " && " + builder.getEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())));
+			} 
+			else {
+				builder.setEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), isValidVar);
+			}		
+		}
 	}
 	
 	/**
@@ -906,6 +905,24 @@ public class CommandHandler extends AbstractHandler {
 	private boolean isChoice(Vertex vertex) throws IncQueryException {
 		for (ChoicesMatch choicesMatch : matcher.getAllChoices()) {
 			if (choicesMatch.getChoice() == vertex) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	private boolean hasEntryEvent(Vertex state) throws IncQueryException {
+		for (StatesWithEntryEventMatch statesWithEntryEventMatch : matcher.getAllStatesWithEntryEvent()) {
+			if (statesWithEntryEventMatch.getState() == state) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	private boolean hasExitEvent(Vertex state) throws IncQueryException {
+		for (StatesWithExitEventMatch statesWithExitEventMatch : matcher.getAllStatesWithExitEvent()) {
+			if (statesWithExitEventMatch.getState() == state) {
 				return true;
 			}
 		}

@@ -118,7 +118,8 @@ pattern edgesWithEffect(transition : Transition, effect : ReactionEffect, expres
 }
 
 // Az EntryEventtel rendelkezõ state-ek effectjét adja vissza
-pattern statesWithEntryEvent(state : State, /*effect : ReactionEffect,*/ expression : Expression) {
+pattern statesWithEntryEvent(state : State, parentRegion : Region, expression : Expression) {
+	State.parentRegion(state, parentRegion);
 	State.localReactions(state, reaction);
 	Reaction.trigger(reaction, trigger);
 	ReactionTrigger.triggers(trigger, entryEvent);
@@ -128,7 +129,8 @@ pattern statesWithEntryEvent(state : State, /*effect : ReactionEffect,*/ express
 }
 
 // Az ExitEventtel rendelkezõ state-ek effectjét adja vissza
-pattern statesWithExitEvent(state : State,/*effect : ReactionEffect,*/ expression : Expression) {
+pattern statesWithExitEvent(state : State, transition : Transition, expression : Expression) {
+	State.outgoingTransitions(state, transition);
 	State.localReactions(state, reaction);
 	Reaction.trigger(reaction, trigger);
 	ReactionTrigger.triggers(trigger, exitEvent);
