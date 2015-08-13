@@ -1,6 +1,5 @@
 package inc;
 
-import org.eclipse.emf.common.util.EList;
 import org.yakindu.base.expressions.expressions.AssignmentExpression;
 import org.yakindu.base.expressions.expressions.BitwiseAndExpression;
 import org.yakindu.base.expressions.expressions.BitwiseOrExpression;
@@ -20,51 +19,10 @@ import org.yakindu.base.expressions.expressions.NumericalUnaryExpression;
 import org.yakindu.base.expressions.expressions.ParenthesizedExpression;
 import org.yakindu.base.expressions.expressions.PrimitiveValueExpression;
 import org.yakindu.base.expressions.expressions.ShiftExpression;
-import org.yakindu.sct.model.stext.stext.Guard;
-import org.yakindu.sct.model.stext.stext.ReactionEffect;
-import org.yakindu.sct.model.stext.stext.ReactionTrigger;
 import org.yakindu.sct.model.stext.stext.VariableDefinition;
 
 public class UppaalCodeGenerator {
 	
-	/**
-	 * A Yakindu ReactionEffecteket UPPAAL szabályoknak megfelelõ string effectté transzformáló metódus.
-	 * @param reaction A Yakindu ReactionEffect, amelyet transzformálni kell.
-	 * @return Egy string, amely tartalmazza az effecteket, UPPAAL szabályoknak megfelelõen.
-	 */
-	public static String transformEffect(ReactionEffect reaction) {
-		if (reaction == null) {
-			return "";
-		}		
-		String expression = "";
-		EList<Expression> expressionList = reaction.getActions();
-		// Vizsgálni kell, hogy ez null-e?
-		for (Expression exp : expressionList) {
-			if (!expression.equals("")) {
-				expression = expression + ", ";
-			}
-			expression = expression + transformExpression(exp);
-		}
-		return expression;		
-	}
-	
-	/**
-	 * A Yakindu ReactionTriggereket UPPAAL szabályoknak megfelelõ guarddá transzformáló metódus. Csak a guardokkal foglalkozik, triggerekkel nem.
-	 * @param trigger A Yakindu ReactionTrigger, amleyet transzformálni kell.
-	 * @return Egy string, amely tartalmazza a guardot, UPPAAL szabályoknak megfelelõen.
-	 */
-	public static String transformGuard(ReactionTrigger trigger) {
-		if (trigger == null) {
-			return "";
-		}
-		String expression = "";
-		if (trigger.getGuard() != null) {
-			Guard guard = trigger.getGuard();
-			expression = expression + transformExpression(guard.getExpression());
-		}
-		return expression;
-	}
-
 	/**
 	 * A Yakindu expressionöket UPPAAL szabályoknak megfelelõ kifejezésekké transzformáló metódus.
 	 * @param expression A Yakindu expression, amelyet transzformálni kell.
