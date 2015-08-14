@@ -22,7 +22,6 @@ import org.eclipse.incquery.runtime.exception.IncQueryException;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.ui.handlers.HandlerUtil;
-import org.yakindu.sct.model.sgraph.Entry;
 import org.yakindu.sct.model.sgraph.Region;
 import org.yakindu.sct.model.sgraph.State;
 import org.yakindu.sct.model.sgraph.Statechart;
@@ -110,6 +109,7 @@ public class CommandHandler extends AbstractHandler {
 								Statechart statechart = (Statechart) resource.getContents().get(0);
 
 								matcher = new PatternMatcher();
+								Helper.setMatcher(matcher);
 								matcher.setResource(resource); // IncQuery engine inicializáció a resource-ra: statechartot tartalmazó fájl
 								
 								try {
@@ -204,7 +204,7 @@ public class CommandHandler extends AbstractHandler {
 		for (EntryOfRegionsMatch regionMatch : regionMatches) {
 			Template template = null;			
 			// Kiszedjük a template nevekbõl a szóközöket, mert az UPPAAL nem szereti
-			if (isTopRegion(regionMatch.getRegion())) {
+			if (Helper.isTopRegion(regionMatch.getRegion())) {
 				template = builder.createTemplate(regionMatch.getRegionName().replaceAll(" ", "") + "OfStatechart");
 				// Mégis foglalkozunk, hogy a regionökön átívelõ tranziciók helyes lefutása garantálható legyen
 				builder.addLocalDeclaration("bool " + isValidVar + " = true;", template);
@@ -223,7 +223,7 @@ public class CommandHandler extends AbstractHandler {
 			template.setInit(entryLocation);
 			builder.setLocationComment(entryLocation, "Initial entry node");
 			// Az entry node legfelsõ szinten committed, alsóbb szinteken urgent, hogy ne legyen baj a deadlock-kal, ha committed állapotól kijövõ éleken van guard
-			if (isTopRegion(regionMatch.getRegion())) {
+			if (Helper.isTopRegion(regionMatch.getRegion())) {
 				builder.setLocationCommitted(entryLocation);		
 			}
 			else {
@@ -259,7 +259,7 @@ public class CommandHandler extends AbstractHandler {
 		// Beállítjuk a composite state-ek entry transitionjeit, hogy minden bemenetkor minden alrégió helyes állapotba kerüljön (kezdõállapot/önmaga, true)
 		createEntryEdgesForAbstractionLevels();
 		
-		// Beállítjuk a composite state-ek exit transitionjeit, hogy minden kimenetjir minden alrégió helyes állapotba kerüljön (false)
+		// Beállítjuk a composite state-ek exit transitionjeit, hogy minden kimenetkor minden alrégió helyes állapotba kerüljön (false)
 		createExitEdgesForAbstractionLevels();
 		
 		// Beállítjuk azon csatornákat, amelyek különbözõ absztakciós szintek közötti tranziciókat vezérlik
@@ -289,7 +289,7 @@ public class CommandHandler extends AbstractHandler {
 			if (stateMatch.getParentRegion() == region) {										
 				Location aLocation = builder.createLocation(stateMatch.getName(), template);
 				stateLocationMap.put(stateMatch.getState(), aLocation); // A state-location párokat betesszük a map-be	
-				if (isCompositeState(stateMatch.getState())) {
+				if (Helper.isCompositeState(stateMatch.getState())) {
 					builder.setLocationComment(aLocation, "Composite state");
 				}
 				else {
@@ -377,7 +377,7 @@ public class CommandHandler extends AbstractHandler {
 			for (SourceAndTargetOfTransitionsMatch transitionMatch : matcher.getAllTransitions()) {
 				if (transitionMatch.getTarget() == exitNodesMatch.getExit()) {
 					// Ez csak nem composite state-ekre megy, hiszen egy élen csak egy szinkronizáció lehet (és composite esetén a kimenõnek van már)
-					if (!isCompositeState(transitionMatch.getSource())) {	
+					if (!Helper.isCompositeState(transitionMatch.getSource())) {	
 						builder.setEdgeSync(transitionEdgeMap.get(transitionMatch.getTransition()), syncChanVar + (syncChanId), true);
 						builder.setEdgeUpdate(transitionEdgeMap.get(transitionMatch.getTransition()), isValidVar + " = false");
 						// Guardot nem állítunk, azt majd a közös metódusban
@@ -403,7 +403,7 @@ public class CommandHandler extends AbstractHandler {
 			}
 			// Letiltjuk az összes felette lévõ régiót, ehhez lekérjük a felette lévõ regionöket
 			List<Region> regionList = new ArrayList<Region>();
-			regionList = getThisAndUpperRegions(regionList, exitNodesMatch.getRegion());
+			regionList = Helper.getThisAndUpperRegions(regionList, exitNodesMatch.getRegion());
 			// Kivesszük a saját regionét
 			regionList.remove(exitNodesMatch.getRegion());
 			// Letiltjuk a régiókat
@@ -511,7 +511,7 @@ public class CommandHandler extends AbstractHandler {
 			}
 			// Letiltjuk az összes alatta lévõ region-t
 			List<Region> subregionList = new ArrayList<Region>();
-			addAllSubregionsToRegionList(compositeStateMatch.getCompositeState(), subregionList);
+			Helper.addAllSubregionsToRegionList(compositeStateMatch.getCompositeState(), subregionList);
 			setAllRegionsWithSync(false, subregionList);			
 		}
 	}
@@ -529,14 +529,14 @@ public class CommandHandler extends AbstractHandler {
 				// Az adott subregion vertexeit vizsgáljuk
 				if (verticesOfRegionMatch.getRegion() == subregion) {
 					// Choice-okból nem csinálunk magukba éleket, azokban elvileg nem tartózkodhatunk
-					if (!(isChoice(verticesOfRegionMatch.getVertex()))) {
+					if (!(Helper.isChoice(verticesOfRegionMatch.getVertex()))) {
 						Edge syncEdge = builder.createEdge(regionTemplateMap.get(subregion));
 						builder.setEdgeSync(syncEdge, syncChanVar + syncChanId, false);
 						builder.setEdgeUpdate(syncEdge, isValidVar + " = " + ((toBeTrue) ? "true" : "false"));
 						builder.setEdgeSource(syncEdge, stateLocationMap.get(verticesOfRegionMatch.getVertex()));
 						// Ha belépésre engedélyezzük a régiót, akkor vizsgálni kell, hogy hova kössük a szinkornizációs él végpontját
 						if (toBeTrue) {
-							if (hasHistory(subregion)) {
+							if (Helper.hasHistory(subregion)) {
 								if (hasEntryLoc.containsKey(verticesOfRegionMatch.getVertex())) {
 									builder.setEdgeTarget(syncEdge, hasEntryLoc.get(verticesOfRegionMatch.getVertex()).getSource());
 								}
@@ -545,7 +545,7 @@ public class CommandHandler extends AbstractHandler {
 								}
 							}
 							else {
-								builder.setEdgeTarget(syncEdge, stateLocationMap.get(getEntryOfRegion(subregion)));
+								builder.setEdgeTarget(syncEdge, stateLocationMap.get(Helper.getEntryOfRegion(subregion)));
 							}
 						}
 						// Kilépéskor nem vizsgálhatjuk, hogy van-e history pl.: entryLoc-ja van valamelyik composite state-nek és az committed
@@ -556,71 +556,6 @@ public class CommandHandler extends AbstractHandler {
 				}
 			}
 		}
-	}
-	
-	/**
-	 * Ez a metódus paramétersoron visszaadja a megadott state összes alatta lévõ region-jét. (Nem csak az eggyel alatta lévõket.)
-	 * @param state Yakindu composite state, amelynek az összes alatta lévõ regionje kell.
-	 * @param regionList Ebbe a listába fogja betenni a metódus a regionöket.
-	 * @throws IncQueryException 
-	 */
-	private void addAllSubregionsToRegionList(State state, List<Region> regionList) throws IncQueryException {
-		for (RegionsOfCompositeStatesMatch regionsOfCompositeStateMatch : matcher.getAllRegionsOfCompositeStates()) {
-			if (regionsOfCompositeStateMatch.getCompositeState() == state) {
-				regionList.add(regionsOfCompositeStateMatch.getSubregion());
-				for (VerticesOfRegionsMatch verticesOfRegionsMatch : matcher.getAllVerticesOfRegions()) {
-					if (verticesOfRegionsMatch.getRegion() == regionsOfCompositeStateMatch.getSubregion() && (isCompositeState(verticesOfRegionsMatch.getVertex()))) {
-						addAllSubregionsToRegionList((State) verticesOfRegionsMatch.getVertex(), regionList);
-					}
-				}
-			}
-		}
-	}	
-	
-	/**
-	 * Visszaadja, hogy található-e a regionben vagy felette deep history indicator.
-	 * @param region Yakindu region, amely felett keressük a deep history indicatort.
-	 * @return Van-e a regionben, vagy felette deep history indicator. 
-	 * @throws IncQueryException 
-	 */
-	private boolean hasDeepHistoryAbove(Region region) throws IncQueryException {
-		if (isTopRegion(region)) {
-			return false;
-		}
-		else {
-			for (RegionsOfCompositeStatesMatch regionsOfCompositeStateMatch : matcher.getAllRegionsOfCompositeStates()) {
-				if (regionsOfCompositeStateMatch.getSubregion() == region) {
-					return ((getEntryOfRegion(regionsOfCompositeStateMatch.getParentRegion()).getKind().getValue() == 2) || hasDeepHistoryAbove(regionsOfCompositeStateMatch.getParentRegion()));
-				}
-			}
-			return false;
-		}
-	}
-	
-	/**
-	 * Ez a metódus megmondja, hogy a megadott regionnek, van-e historyja.
-	 * @param region A Yakindu region, amelyrõl el szeretnénk döntenti, hogy van-e historyja.
-	 * @return Van-e a regionnek historyja.
-	 * @throws IncQueryException
-	 */
-	private boolean hasHistory(Region region) throws IncQueryException {
-		return (hasDeepHistoryAbove(region) || (getEntryOfRegion(region).getKind().getValue() == 1) || (getEntryOfRegion(region).getKind().getValue() == 2));
-	}
-	
-	/**
-	 * Ez a metódus visszaadja egy adott region entry elemét.
-	 * Feltételezi, hogy csak egy ilyen van egy region-ben. (Különben a Yakindu modell hibás.)
-	 * @param region A Yakindu region, amelyben keressük az entry.
-	 * @return A Yakindu entry elem.
-	 * @throws IncQueryException 
-	 */
-	private Entry getEntryOfRegion(Region region) throws IncQueryException {
-		for (EntryOfRegionsMatch entryOfRegionsMatch : matcher.getAllRegionsWithEntry()) {
-			if (entryOfRegionsMatch.getRegion() == region) {
-				return entryOfRegionsMatch.getEntry();
-			}
-		}
-		return null;
 	}
 	
 	/**
@@ -635,8 +570,8 @@ public class CommandHandler extends AbstractHandler {
 			// Ha a két végpont nem azonos region-ben van:
 			// Megnézzük melyik milyen szintû, és aszerint hozzuk létre a szinkronizációs csatornákat
 			if (stateLocationMap.containsKey(acrossTransitionMatch.getSource()) && stateLocationMap.containsKey(acrossTransitionMatch.getTarget())) {								
-				int sourceLevel = getLevelOfVertex(acrossTransitionMatch.getSource());
-				int targetLevel = getLevelOfVertex(acrossTransitionMatch.getTarget());
+				int sourceLevel = Helper.getLevelOfVertex(acrossTransitionMatch.getSource());
+				int targetLevel = Helper.getLevelOfVertex(acrossTransitionMatch.getTarget());
 				if (sourceLevel < targetLevel) {
 					createEdgesWhenSourceLesser(acrossTransitionMatch.getSource(), acrossTransitionMatch.getTarget(), acrossTransitionMatch.getTransition(), targetLevel, targetLevel - sourceLevel, new ArrayList<Region>());							
 				}						
@@ -645,31 +580,6 @@ public class CommandHandler extends AbstractHandler {
 				}
 			}				
 		}
-	}
-	
-	/**
-	 * Visszaadja, hogy egy vertex elem milyen messze található a legfölsõ regiontõl.
-	 * (Ha a legfölsõ regionben található, akkor ez az érték 0.)
-	 * @param vertex A Yakindu vertex, amelynek lekérjük a szintjét.
-	 * @return A szint mint egész szám.
-	 * @throws IncQueryException 
-	 */
-	private int getLevelOfVertex(Vertex vertex) throws IncQueryException {
-		for (VerticesOfRegionsMatch verticesOfRegionsMatch : matcher.getAllVerticesOfRegions()) {
-			if (verticesOfRegionsMatch.getVertex() == vertex) {
-				if (isTopRegion(verticesOfRegionsMatch.getRegion())) {
-					return 0;
-				}
-				else {
-					for (RegionsOfCompositeStatesMatch regionsOfCompositeStatesMatch : matcher.getAllRegionsOfCompositeStates()) {
-						if (regionsOfCompositeStatesMatch.getSubregion() == verticesOfRegionsMatch.getRegion()) {
-							return (getLevelOfVertex(regionsOfCompositeStatesMatch.getCompositeState()) + 1);
-						}
-					}
-				}
-			}
-		}
-		throw new IllegalArgumentException("A " + vertex.toString() + " composite-ja nem State és nem Statechart.");
 	}
 	
 	/**
@@ -698,7 +608,7 @@ public class CommandHandler extends AbstractHandler {
 			builder.setEdgeSync(abstractionEdge, syncChanVar + (syncChanId), true);
 			builder.setEdgeComment(abstractionEdge, "A Yakinduban alacsonyabb absztrakcios szinten levo vertexbe vezeto el.");
 			// Ha a targetnek van entryEventje, akkor azt rá kell írni az élre
-			if (hasEntryEvent(target)) {
+			if (Helper.hasEntryEvent(target)) {
 				for (StatesWithEntryEventMatch statesWithEntryEventMatch : matcher.getAllStatesWithEntryEvent()) {
 					if (statesWithEntryEventMatch.getState() == target) {
 						String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
@@ -709,7 +619,7 @@ public class CommandHandler extends AbstractHandler {
 			// Ez az él felel majd meg a regionökön átívelõ transitionnek
 			transitionEdgeMap.put(transition, abstractionEdge);
 			// Ha a target composite state, akkor belépésre minden alrégiójába is belépünk
-			if (isCompositeState(target)) {
+			if (Helper.isCompositeState(target)) {
 				List<Region> pickedSubregions = new ArrayList<Region>(((State) target).getRegions()); // Talán addAll kéne?
 				pickedSubregions.removeAll(visitedRegions);
 				setAllRegionsWithSync(true, pickedSubregions);				
@@ -723,7 +633,7 @@ public class CommandHandler extends AbstractHandler {
 					builder.setEdgeSource(syncEdge, stateLocationMap.get(verticesOfRegionsMatch.getVertex()));
 					builder.setEdgeTarget(syncEdge, stateLocationMap.get(target));	
 					// Ha a targetnek van entryEventje, akkor azt rá kell írni az élre
-					if (hasEntryEvent(target)) {
+					if (Helper.hasEntryEvent(target)) {
 						for (StatesWithEntryEventMatch statesWithEntryEventMatch : matcher.getAllStatesWithEntryEvent()) {
 							if (statesWithEntryEventMatch.getState() == target) {
 								String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
@@ -736,7 +646,7 @@ public class CommandHandler extends AbstractHandler {
 				}
 			}
 			// Ha a target composite state, akkor ezt minden region-jére megismételjük, kivéve ezt a regiont
-			if (isCompositeState(target)) {
+			if (Helper.isCompositeState(target)) {
 				List<Region> pickedSubregions = new ArrayList<Region>(((State) target).getRegions()); // Talán addAll kéne?
 				pickedSubregions.removeAll(visitedRegions);
 				setAllRegionsWithSync(true, pickedSubregions);				
@@ -756,7 +666,7 @@ public class CommandHandler extends AbstractHandler {
 	private void createEdgesWhenSourceGreater(Vertex source, Vertex target, Transition transition, int lastLevel, List<Region> visitedRegions) throws IncQueryException {
 		// A legalsó szinten létrehozunk egy magába vezetõ élet:  
 		// Ez felel meg az alacsonyabb szintrõl magasabb szinten lévõ vertexbe vezetõ átmenetnek
-		if (getLevelOfVertex(source) == lastLevel) {
+		if (Helper.getLevelOfVertex(source) == lastLevel) {
 			visitedRegions.add(source.getParentRegion());
 			// Létrehozunk egy szinkronizációs csatornát rá
 			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
@@ -772,14 +682,14 @@ public class CommandHandler extends AbstractHandler {
 			createEdgesWhenSourceGreater((Vertex) source.getParentRegion().getComposite(), target, transition, lastLevel, visitedRegions);
 		}
 		// A felsõ szint
-		else if (getLevelOfVertex(source) == getLevelOfVertex(target)) {
+		else if (Helper.getLevelOfVertex(source) == Helper.getLevelOfVertex(target)) {
 			// A felsõ szinten létrehozzuk az élet, amely fogadja a szinkronizációt
 			Edge ownSyncEdge = builder.createEdge(regionTemplateMap.get(source.getParentRegion()));
 			builder.setEdgeSource(ownSyncEdge, stateLocationMap.get(source));
 			builder.setEdgeTarget(ownSyncEdge, stateLocationMap.get(target));
 			builder.setEdgeSync(ownSyncEdge, syncChanVar + (syncChanId), false);
 			// Exit eventet rárakjuk, ha van
-			if (hasExitEvent(source)) {
+			if (Helper.hasExitEvent(source)) {
 				for (StatesWithExitEventMatch statesWithExitEventMatch : matcher.getAllStatesWithExitEvent()) {
 					if (statesWithExitEventMatch.getState() == source) {
 						String effect = UppaalCodeGenerator.transformExpression(statesWithExitEventMatch.getExpression());
@@ -791,7 +701,7 @@ public class CommandHandler extends AbstractHandler {
 			// Kivéve a meglátogatottakat
 			List<Region> subregionList = new ArrayList<Region>();
 			State sourceState = (State) source;
-			addAllSubregionsToRegionList(sourceState, subregionList);
+			Helper.addAllSubregionsToRegionList(sourceState, subregionList);
 			subregionList.removeAll(visitedRegions);
 			setAllRegionsWithSync(false, subregionList);
 			return;
@@ -804,7 +714,7 @@ public class CommandHandler extends AbstractHandler {
 			builder.setEdgeTarget(ownSyncEdge, stateLocationMap.get(source));
 			builder.setEdgeSync(ownSyncEdge, syncChanVar + (syncChanId), false);
 			builder.setEdgeUpdate(ownSyncEdge, isValidVar + " = false");
-			if (hasExitEvent(source)) {
+			if (Helper.hasExitEvent(source)) {
 				for (StatesWithExitEventMatch statesWithExitEventMatch : matcher.getAllStatesWithExitEvent()) {
 					if (statesWithExitEventMatch.getState() == source) {
 						String effect = UppaalCodeGenerator.transformExpression(statesWithExitEventMatch.getExpression());
@@ -902,95 +812,4 @@ public class CommandHandler extends AbstractHandler {
 		}
 	}
 	
-	/**
-	 * Visszaadja a regiont, és a felette lévõ faszerkezetben elhelyezkedõ regionöket.
-	 * @param regionList Eleinte üres lista, amelyben tárolni fogja a regionöket.
-	 * @param region Ettõl a Yakindu region-tõl kezde indulunk el felfelé, és tároljuk el a regionöket.
-	 * @return Egy lista a faszerkezetben lévõ regionökrõl
-	 */
-	private List<Region> getThisAndUpperRegions(List<Region> regionList, Region region) {
-		regionList.add(region);
-		if (region.getComposite() instanceof Statechart) {
-			return regionList;
-		}
-		else {		
-			return getThisAndUpperRegions(regionList, ((State) region.getComposite()).getParentRegion());
-		}
-	}
-	
-	/**
-	 * Ez a metódus eldönti, hogy a megadott Yakindu region legfelsõ szintû-e.
-	 * @param region Yakindu region, amelyrõl el szeretnénk dönteni, hogy top szintû-e.
-	 * @return Top szintû-e vagy nem.
-	 * @throws IncQueryException
-	 */
-	private boolean isTopRegion(Region region) throws IncQueryException {
-		for (TopRegionsMatch topRegionMatch : matcher.getAllTopRegions()) {
-			if (topRegionMatch.getRegion() == region) {
-				return true;
-			}
-		}
-		return false;
-	}
-	
-	/**
-	 * Ez a metódus eldönti, hogy a megadott Yakindu vertex composite state-e.
-	 * @param vertex Yakindu vertex, amelyrõl el szeretnénk dönteni, hogy composite state-e.
-	 * @return Composite state-e vagy nem.
-	 * @throws IncQueryException
-	 */
-	private boolean isCompositeState(Vertex vertex) throws IncQueryException {
-		for (CompositeStatesMatch compositeStatesMatch : matcher.getAllCompositeStates()) {
-			if (compositeStatesMatch.getCompositeState() == vertex) {
-				return true;
-			}
-		}
-		return false;
-	}
-	
-	/**
-	 * Ez a metódus eldönti, hogy a megadott Yakindu vertex choice-e.
-	 * @param vertex Yakindu vertex, amelyrõl el szeretnénk dönteni, hogy choice-e.
-	 * @return Choice-e vagy nem.
-	 * @throws IncQueryException
-	 */
-	private boolean isChoice(Vertex vertex) throws IncQueryException {
-		for (ChoicesMatch choicesMatch : matcher.getAllChoices()) {
-			if (choicesMatch.getChoice() == vertex) {
-				return true;
-			}
-		}
-		return false;
-	}
-	
-	/**
-	 * Ez a metódus eldönti, hogy a megadott Yakindu vertexnek van-e entry eventje.
-	 * @param state Yakindu vertex, amelyrõl el szeretnénk dönteni, van-e entry eventje.
-	 * @return Van-e entry eventje vagy nem.
-	 * @throws IncQueryException
-	 */
-	private boolean hasEntryEvent(Vertex state) throws IncQueryException {
-		for (StatesWithEntryEventMatch statesWithEntryEventMatch : matcher.getAllStatesWithEntryEvent()) {
-			if (statesWithEntryEventMatch.getState() == state) {
-				return true;
-			}
-		}
-		return false;
-	}
-	
-	/**
-	 * Ez a metódus eldönti, hogy a megadott Yakindu vertexnek van-e exit eventje.
-	 * @param state Yakindu vertex, amelyrõl el szeretnénk dönteni, van-e exit eventje.
-	 * @return Van-e exit eventje vagy nem.
-	 * @throws IncQueryException
-	 */
-	private boolean hasExitEvent(Vertex state) throws IncQueryException {
-		for (StatesWithExitEventMatch statesWithExitEventMatch : matcher.getAllStatesWithExitEvent()) {
-			if (statesWithExitEventMatch.getState() == state) {
-				return true;
-			}
-		}
-		return false;
-	}
-
 }

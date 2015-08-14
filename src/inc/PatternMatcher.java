@@ -19,10 +19,11 @@ public class PatternMatcher {
 	
 	private static RunOnceQueryEngine runOnceEngine = null;
 
+	@SuppressWarnings("deprecation")
 	public void setResource(org.eclipse.emf.ecore.resource.Resource res) {
 		try {
 			resource = res;
-			engine = IncQueryEngine.on(res);
+			engine = IncQueryEngine.on(resource);
 			runOnceEngine = new RunOnceQueryEngine(res);
 		} catch (IncQueryException e) {
 			e.printStackTrace();
