@@ -43,7 +43,7 @@ public class UppaalCodeGenerator {
 			case 1:
 				return " -" + transformExpression(NUExpression.getOperand());
 			case 2:
-				return " ^" + transformExpression(NUExpression.getOperand());
+				return " (-1 ^" + transformExpression(NUExpression.getOperand()) + ")"; // Az invertálás: 11..11-gyel való xor mûvelet: UPPAAL-ban nincs ~operátor
 			default:
 				return "";
 			}

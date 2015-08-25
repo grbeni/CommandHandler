@@ -172,23 +172,23 @@ public class CommandHandler extends AbstractHandler {
 		Collection<VariableDefinitionsMatch> allVariableDefinitions = matcher.getAllVariables();
 		System.out.println("A változók száma: " + allVariableDefinitions.size());
 		for (VariableDefinitionsMatch variableMatch : allVariableDefinitions) {
-			String expression = "";
+			StringBuilder expression = new StringBuilder();
 			if (variableMatch.getIsReadonly()) {
-				expression = expression + "const ";
+				expression.append("const ");
 			}
 			if (variableMatch.getType().getName() == "integer") { 
-				expression = expression + "int ";
+				expression.append("int ");
 			}
 			else if (variableMatch.getType().getName() == "boolean") {
-				expression = expression + "bool ";
+				expression.append("bool ");
 			}
-			expression = expression + variableMatch.getName() + " ";
+			expression.append(variableMatch.getName() + " ");
 			if (variableMatch.getVariable().getInitialValue() == null) {
-				expression = expression + ";";
-				builder.addGlobalDeclaration(expression);
+				expression.append(";");
+				builder.addGlobalDeclaration(expression.toString());
 			}
 			else {
-				builder.addGlobalDeclaration(expression + "=" + UppaalCodeGenerator.transformExpression(variableMatch.getVariable().getInitialValue()) + ";");
+				builder.addGlobalDeclaration(expression.append("=" + UppaalCodeGenerator.transformExpression(variableMatch.getVariable().getInitialValue()) + ";").toString());
 			}			
 		}
 	}
