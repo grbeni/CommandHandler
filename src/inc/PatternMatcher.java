@@ -147,4 +147,12 @@ public class PatternMatcher {
 		return runOnceEngine.getAllMatches(StatesWithExitEventMatcher.querySpecification());
 	}
 	
+	public Collection<EdgesWithRaisingEventMatch> getAllEdgesWithRaisingEvent() throws IncQueryException {
+		return EdgesWithRaisingEventMatcher.on(engine).getAllMatches();
+	}
+	
+	public Collection<EdgesWithTriggerElementReferenceMatch> getAllEdgesWithTriggerElementReference() throws IncQueryException {
+		return EdgesWithTriggerElementReferenceMatcher.on(engine).getAllMatches();
+	}
+	
 }

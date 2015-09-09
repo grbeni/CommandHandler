@@ -150,3 +150,20 @@ pattern edgesWithGuard(transition : Transition, guard : Guard, expression : Expr
 	ReactionTrigger.guard(trigger, guard);
 	find guardToExpression(guard, expression);
 }
+
+// Raising eventtel rendelkezõ edge-eket adja meg
+pattern edgesWithRaisingEvent(transition : Transition, element){
+	Transition.effect(transition, effect);	
+	Reaction.effect(_reaction, effect);
+	find reactionEffectToExpression(effect, raiseExpression);
+	EventRaisingExpression.event(raiseExpression, event);
+	ElementReferenceExpression.reference(event, element);
+}
+
+// Raising Event célpontjai
+pattern edgesWithTriggerElementReference(transition : Transition, element){
+	Transition.trigger(transition, reactionTrigger);
+	ReactionTrigger.triggers(reactionTrigger, trigger);
+	RegularEventSpec.event(trigger, event);
+	ElementReferenceExpression.reference(event, element);
+}

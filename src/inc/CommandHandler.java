@@ -54,34 +54,34 @@ public class CommandHandler extends AbstractHandler {
 	// Uppaal változónevek
 	private final String syncChanVar = "syncChan";
 	private final String isValidVar = "isValid";
-	
+			
 	// Az IncQuery illeszkedések lekérésére
 	private PatternMatcher matcher = null;
-	
+			
 	// Az UPPAAL modell felépítésre
 	private UppaalModelBuilder builder = null;	
-	
+			
 	// Egy Map a Yakindu:Region -> UPPAAL:Template leképzésre									 								
 	private Map<Region, Template> regionTemplateMap = null;
-	
+			
 	// Egy Map a Yakindu:Vertex -> UPPAAL:Location leképzésre									 								
 	private Map<Vertex, Location> stateLocationMap = null;
-	
+			
 	// Egy Map a Yakindu:Transition -> UPPAAL:Edge leképzésre
 	private Map<Transition, Edge> transitionEdgeMap = null;
-	
+			
 	// Egy Map a Yakindu:Transition -> UPPAAL:Edge leképzésre
 	private Map<Vertex, Edge> hasEntryLoc = null;
-	
+			
 	// Egy Map a Yakindu:Transition -> UPPAAL:Edge leképzésre
 	private Map<Vertex, Edge> hasExitLoc = null;
-	
+			
 	// Szinkronizációs csatornák létrehozására
 	private int syncChanId = 0;
 	// EntryLoc név generálásra
 	private int entryStateId = 0;
 	// ExitLoc név generálásra
-	private int exitStateId = 0;
+	private int exitStateId = 0;	
 
 	@Override
 	public Object execute(ExecutionEvent event) throws ExecutionException {
@@ -195,9 +195,9 @@ public class CommandHandler extends AbstractHandler {
 	
 	/**
 	 * Ez a metódus létrehozza az egyes UPPAAL template-eket a Yakindu regionök alapján.
-	 * @throws IncQueryException
+	 * @throws Exception 
 	 */
-	private void createTemplates() throws IncQueryException {
+	private void createTemplates() throws Exception {
 		// Lekérjük a régiókat
 		Collection<EntryOfRegionsMatch> regionMatches = matcher.getAllRegionsWithEntry();
 		// Végigmegyünk a régiókon, és létrehozzuk a Yakindu modellnek megfeleltethetõ elemeket.
@@ -728,9 +728,9 @@ public class CommandHandler extends AbstractHandler {
 	
 	/**
 	 * Ez a metódus létrehozza az UPPAAL edge-eken az update-eket a Yakindu effectek alapján.
-	 * @throws IncQueryException 
+	 * @throws Exception 
 	 */
-	private void setEdgeUpdates() throws IncQueryException {
+	private void setEdgeUpdates() throws Exception {
 		// Végigmegyünk minden transition-ön, amelynek van effectje
 		for (EdgesWithEffectMatch edgesWithEffectMatch : matcher.getAllEdgesWithEffect()) {
 			String effect = UppaalCodeGenerator.transformExpression(edgesWithEffectMatch.getExpression());
@@ -738,6 +738,8 @@ public class CommandHandler extends AbstractHandler {
 		}
 		// Megcsiáljuk a state update-eket is
 		setEdgeUpdatesFromStates();
+		// Itt csináljuk meg a raise eventeket
+		createRaisingEventSyncs();
 	}
 	
 	/**
@@ -809,6 +811,30 @@ public class CommandHandler extends AbstractHandler {
 			else {
 				builder.setEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), isValidVar);
 			}		
+		}
+	}
+	
+	/**
+	 * Ez a metódus felel az event raising megvalósításáért.
+	 * @throws Exception Jelzi, ha nem mûködik a szinkronizáció. (Nem tökéletes még ez a kód.)
+	 */
+	private void createRaisingEventSyncs() throws Exception {
+		for (EdgesWithRaisingEventMatch edgesWithRaisingEventMatch : matcher.getAllEdgesWithRaisingEvent()) {
+			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
+			if (transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()).getSynchronization() != null) {
+				throw new Exception("Baj van a raising cuccal, mert már van syncje.");
+			}
+			builder.setEdgeSync(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()), syncChanVar + (syncChanId), true);
+			for (EdgesWithTriggerElementReferenceMatch edgesWithTriggerElementReferenceMatch : matcher.getAllEdgesWithTriggerElementReference()) {
+				if (edgesWithTriggerElementReferenceMatch.getElement() == edgesWithRaisingEventMatch.getElement()) {
+					if (transitionEdgeMap.get(edgesWithTriggerElementReferenceMatch.getTransition()).getSynchronization() != null) {
+						throw new Exception("Baj van a raising cuccal, mert már van syncje.");
+					}
+					else {
+						builder.setEdgeSync(transitionEdgeMap.get(edgesWithTriggerElementReferenceMatch.getTransition()), syncChanVar + (syncChanId), false);
+					}
+				}
+			}
 		}
 	}
 	

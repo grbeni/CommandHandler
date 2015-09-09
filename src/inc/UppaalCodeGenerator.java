@@ -19,6 +19,7 @@ import org.yakindu.base.expressions.expressions.NumericalUnaryExpression;
 import org.yakindu.base.expressions.expressions.ParenthesizedExpression;
 import org.yakindu.base.expressions.expressions.PrimitiveValueExpression;
 import org.yakindu.base.expressions.expressions.ShiftExpression;
+import org.yakindu.sct.model.stext.stext.EventRaisingExpression;
 import org.yakindu.sct.model.stext.stext.VariableDefinition;
 
 public class UppaalCodeGenerator {
@@ -143,6 +144,11 @@ public class UppaalCodeGenerator {
 		else if (expression instanceof ParenthesizedExpression) {
 			ParenthesizedExpression parent = (ParenthesizedExpression) expression;
 			return "(" + transformExpression(parent.getExpression()) + ")";
+		}
+		else if (expression instanceof EventRaisingExpression) {
+			// Ekkor nem a transitionre írunk rá, hanem sync csatornát hozunk létre
+			// lsd.: createRaisingEventSyncs() metódus
+			return "";
 		}
 		// Különben nem ismert kifejezés kivételt dobok
 		else {
