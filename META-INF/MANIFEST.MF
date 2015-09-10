@@ -23,8 +23,7 @@ Require-Bundle: org.yakindu.sct.model.sgen,
  org.eclipse.jface,
  org.yakindu.base.expressions.edit;bundle-version="2.4.1",
  org.yakindu.base.expressions.ui;bundle-version="2.4.1",
- org.yakindu.base.expressions,
- ModelTraverser;bundle-version="1.0.0"
+ org.yakindu.base.expressions
 Bundle-RequiredExecutionEnvironment: JavaSE-1.6
 Import-Package: org.apache.log4j
 Bundle-ActivationPolicy: lazy

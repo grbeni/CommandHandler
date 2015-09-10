@@ -147,12 +147,21 @@ public class PatternMatcher {
 		return runOnceEngine.getAllMatches(StatesWithExitEventMatcher.querySpecification());
 	}
 	
+	public int getCompositeStateCount() throws IncQueryException {
+		//return StatesWithExitEventMatcher.on(engine).getAllMatches();
+		return CompositeStateCountMatcher.on(engine).countMatches();
+	}
+	
 	public Collection<EdgesWithRaisingEventMatch> getAllEdgesWithRaisingEvent() throws IncQueryException {
 		return EdgesWithRaisingEventMatcher.on(engine).getAllMatches();
 	}
 	
 	public Collection<EdgesWithTriggerElementReferenceMatch> getAllEdgesWithTriggerElementReference() throws IncQueryException {
 		return EdgesWithTriggerElementReferenceMatcher.on(engine).getAllMatches();
+	}
+	
+	public Collection<EdgesFromEntryOfParallelRegionsMatch> getedgesFromEntryOfParallelRegions() throws IncQueryException {
+		return EdgesFromEntryOfParallelRegionsMatcher.on(engine).getAllMatches();
 	}
 	
 }

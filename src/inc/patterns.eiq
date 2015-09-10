@@ -88,6 +88,11 @@ pattern edgesAcrossRegions(transition : Transition, source : Vertex, target : Ve
 }
 
 // Composite state-eket adja vissza
+pattern compositeStateCount(compositeState : State) {
+	State.regions(compositeState, _region);
+}
+
+// Composite state-eket adja vissza
 pattern compositeStates(compositeState : State, parentRegion : Region, name) {
 	State.regions(compositeState, _region);
 	State.name(compositeState, name);
@@ -166,4 +171,10 @@ pattern edgesWithTriggerElementReference(transition : Transition, element){
 	ReactionTrigger.triggers(reactionTrigger, trigger);
 	RegularEventSpec.event(trigger, event);
 	ElementReferenceExpression.reference(event, element);
+}
+
+pattern edgesFromEntryOfParallelRegions(compositeState : State, transition : Transition) {
+	State.regions(compositeState, region);
+	Region.vertices(region, entry);
+	Entry.outgoingTransitions(entry, transition);
 }

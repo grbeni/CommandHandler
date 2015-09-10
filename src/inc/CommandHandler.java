@@ -273,6 +273,9 @@ public class CommandHandler extends AbstractHandler {
 		
 		// Template guardok berakása
 		createTemplateValidityGuards();
+		
+		// Entry kimenõ élek beSyncelése
+		createSyncFromEtrys();
 	}
 	
 	/**
@@ -834,6 +837,27 @@ public class CommandHandler extends AbstractHandler {
 						builder.setEdgeSync(transitionEdgeMap.get(edgesWithTriggerElementReferenceMatch.getTransition()), syncChanVar + (syncChanId), false);
 					}
 				}
+			}
+		}
+	}
+	
+	/**
+	 * Ez a metódus hozza létre a parallel regionökben az entry node-ból való kilépéshez szükséges szinkronizációkat.
+	 * @throws IncQueryException 
+	 * 
+	 */
+	private void createSyncFromEtrys() throws IncQueryException {
+		Map<State, String> hasSync = new HashMap<State, String>();
+		for (EdgesFromEntryOfParallelRegionsMatch edgesFromEntryOfParallelRegionsMatch : matcher.getedgesFromEntryOfParallelRegions()) {
+			if (hasSync.containsKey(edgesFromEntryOfParallelRegionsMatch.getCompositeState())) {
+				builder.setEdgeSync(transitionEdgeMap.get(edgesFromEntryOfParallelRegionsMatch.getTransition()),
+						hasSync.get(edgesFromEntryOfParallelRegionsMatch.getCompositeState()), false);
+			}
+			else {
+				builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
+				hasSync.put(edgesFromEntryOfParallelRegionsMatch.getCompositeState(), syncChanVar + (syncChanId));
+				builder.setEdgeSync(transitionEdgeMap.get(edgesFromEntryOfParallelRegionsMatch.getTransition()),
+						hasSync.get(edgesFromEntryOfParallelRegionsMatch.getCompositeState()), true);
 			}
 		}
 	}
