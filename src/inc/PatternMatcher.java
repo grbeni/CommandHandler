@@ -160,8 +160,12 @@ public class PatternMatcher {
 		return EdgesWithTriggerElementReferenceMatcher.on(engine).getAllMatches();
 	}
 	
-	public Collection<EdgesFromEntryOfParallelRegionsMatch> getedgesFromEntryOfParallelRegions() throws IncQueryException {
+	public Collection<EdgesFromEntryOfParallelRegionsMatch> getEdgesFromEntryOfParallelRegions() throws IncQueryException {
 		return EdgesFromEntryOfParallelRegionsMatcher.on(engine).getAllMatches();
+	}
+	
+	public Collection<EdgesWithTimeTriggerMatch> getEdgesWithTimeTrigger() throws IncQueryException {
+		return EdgesWithTimeTriggerMatcher.on(engine).getAllMatches();
 	}
 	
 }

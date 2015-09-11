@@ -54,6 +54,7 @@ public class CommandHandler extends AbstractHandler {
 	// Uppaal változónevek
 	private final String syncChanVar = "syncChan";
 	private final String isValidVar = "isValid";
+	private final String clockVar = "Timer";
 			
 	// Az IncQuery illeszkedések lekérésére
 	private PatternMatcher matcher = null;
@@ -214,6 +215,8 @@ public class CommandHandler extends AbstractHandler {
 				// Az alsóbb szinteken kezdetben false érvényességi változót vezetünk be
 				builder.addLocalDeclaration("bool " + isValidVar + " = false;", template);
 			}			
+			// Beteszünk egy clockot
+			builder.addLocalDeclaration("clock " + clockVar + ";", template);
 			
 			// A region-template párokat berakjuk a Mapbe
 			regionTemplateMap.put(regionMatch.getRegion(), template);
@@ -228,7 +231,7 @@ public class CommandHandler extends AbstractHandler {
 			}
 			else {
 				// Ez nem tökéletes így, inkább valamiféle committed kéne, de az nem megvalósítható
-				builder.setLocationUrgent(entryLocation);	
+				//builder.setLocationUrgent(entryLocation);	
 			}
 			
 			//Betesszük a kezdõállapotot a Map-be									 
@@ -276,6 +279,9 @@ public class CommandHandler extends AbstractHandler {
 		
 		// Entry kimenõ élek beSyncelése
 		createSyncFromEtrys();
+		
+		// After .. kifejezések transzformálása
+		createTimingEvents();
 	}
 	
 	/**
@@ -848,7 +854,7 @@ public class CommandHandler extends AbstractHandler {
 	 */
 	private void createSyncFromEtrys() throws IncQueryException {
 		Map<State, String> hasSync = new HashMap<State, String>();
-		for (EdgesFromEntryOfParallelRegionsMatch edgesFromEntryOfParallelRegionsMatch : matcher.getedgesFromEntryOfParallelRegions()) {
+		for (EdgesFromEntryOfParallelRegionsMatch edgesFromEntryOfParallelRegionsMatch : matcher.getEdgesFromEntryOfParallelRegions()) {
 			if (hasSync.containsKey(edgesFromEntryOfParallelRegionsMatch.getCompositeState())) {
 				builder.setEdgeSync(transitionEdgeMap.get(edgesFromEntryOfParallelRegionsMatch.getTransition()),
 						hasSync.get(edgesFromEntryOfParallelRegionsMatch.getCompositeState()), false);
@@ -859,6 +865,18 @@ public class CommandHandler extends AbstractHandler {
 				builder.setEdgeSync(transitionEdgeMap.get(edgesFromEntryOfParallelRegionsMatch.getTransition()),
 						hasSync.get(edgesFromEntryOfParallelRegionsMatch.getCompositeState()), true);
 			}
+		}
+	}
+	
+	/**
+	 * @throws IncQueryException 
+	 * 
+	 */
+	private void createTimingEvents() throws IncQueryException {
+		for (EdgesWithTimeTriggerMatch edgesWithTimeTriggerMatch : matcher.getEdgesWithTimeTrigger()) {
+			builder.setEdgeUpdate(transitionEdgeMap.get(edgesWithTimeTriggerMatch.getIncomingTransition()), clockVar + " = 0");
+			builder.setLocationInvariant(stateLocationMap.get(edgesWithTimeTriggerMatch.getSource()), clockVar + " <= " + UppaalCodeGenerator.transformExpression(edgesWithTimeTriggerMatch.getValue()));
+			builder.setEdgeGuard(transitionEdgeMap.get(edgesWithTimeTriggerMatch.getTriggerTransition()), clockVar + " >= " + UppaalCodeGenerator.transformExpression(edgesWithTimeTriggerMatch.getValue()));
 		}
 	}
 	

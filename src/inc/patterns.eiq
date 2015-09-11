@@ -178,3 +178,12 @@ pattern edgesFromEntryOfParallelRegions(compositeState : State, transition : Tra
 	Region.vertices(region, entry);
 	Entry.outgoingTransitions(entry, transition);
 }
+
+pattern edgesWithTimeTrigger(incomingTransition : Transition, triggerTransition : Transition, value : Expression, source : Vertex, parentRegion : Region) {
+	Vertex.incomingTransitions(source, incomingTransition);
+	Vertex.parentRegion(source, parentRegion);
+	Transition.source(triggerTransition, source);
+	Transition.trigger(triggerTransition, reactionTrigger);
+	ReactionTrigger.triggers(reactionTrigger, trigger);
+	TimeEventSpec.value(trigger, value);
+}
