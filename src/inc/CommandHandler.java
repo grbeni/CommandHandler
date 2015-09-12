@@ -53,7 +53,7 @@ public class CommandHandler extends AbstractHandler {
 	 
 	// Uppaal változónevek
 	private final String syncChanVar = "syncChan";
-	private final String isValidVar = "isValid";
+	private final String isActiveVar = "isActive";
 	private final String clockVar = "Timer";
 			
 	// Az IncQuery illeszkedések lekérésére
@@ -208,12 +208,12 @@ public class CommandHandler extends AbstractHandler {
 			if (Helper.isTopRegion(regionMatch.getRegion())) {
 				template = builder.createTemplate(regionMatch.getRegionName().replaceAll(" ", "") + "OfStatechart");
 				// Mégis foglalkozunk, hogy a regionökön átívelõ tranziciók helyes lefutása garantálható legyen
-				builder.addLocalDeclaration("bool " + isValidVar + " = true;", template);
+				builder.addLocalDeclaration("bool " + isActiveVar + " = true;", template);
 			} 
 			else {
 				template = builder.createTemplate(regionMatch.getRegionName().replaceAll(" ", "") + "Of" + ((State) regionMatch.getRegion().getComposite()).getName());
 				// Az alsóbb szinteken kezdetben false érvényességi változót vezetünk be
-				builder.addLocalDeclaration("bool " + isValidVar + " = false;", template);
+				builder.addLocalDeclaration("bool " + isActiveVar + " = false;", template);
 			}			
 			// Beteszünk egy clockot
 			builder.addLocalDeclaration("clock " + clockVar + ";", template);
@@ -388,7 +388,7 @@ public class CommandHandler extends AbstractHandler {
 					// Ez csak nem composite state-ekre megy, hiszen egy élen csak egy szinkronizáció lehet (és composite esetén a kimenõnek van már)
 					if (!Helper.isCompositeState(transitionMatch.getSource())) {	
 						builder.setEdgeSync(transitionEdgeMap.get(transitionMatch.getTransition()), syncChanVar + (syncChanId), true);
-						builder.setEdgeUpdate(transitionEdgeMap.get(transitionMatch.getTransition()), isValidVar + " = false");
+						builder.setEdgeUpdate(transitionEdgeMap.get(transitionMatch.getTransition()), isActiveVar + " = false");
 						// Guardot nem állítunk, azt majd a közös metódusban
 						builder.setEdgeComment(transitionEdgeMap.get(transitionMatch.getTransition()), "Exit node-ba vezeto el, kilep a templatebol.");
 					}
@@ -400,7 +400,7 @@ public class CommandHandler extends AbstractHandler {
 						builder.setEdgeSource(exitEdge, exitLoc);
 						builder.setEdgeTarget(exitEdge, stateLocationMap.get(exitNodesMatch.getExit()));
 						builder.setEdgeSync(exitEdge, syncChanVar + (syncChanId), true);
-						builder.setEdgeUpdate(exitEdge, isValidVar + " = false");
+						builder.setEdgeUpdate(exitEdge, isActiveVar + " = false");
 						// Guardot nem állítunk, azt majd a közös metódusban
 						builder.setEdgeComment(exitEdge, "Exit node-ba vezeto el, kilep a templatebol.");
 						// Bejövõ él targetjét átállítjuk az exitLoc-ra
@@ -541,7 +541,7 @@ public class CommandHandler extends AbstractHandler {
 					if (!(Helper.isChoice(verticesOfRegionMatch.getVertex()))) {
 						Edge syncEdge = builder.createEdge(regionTemplateMap.get(subregion));
 						builder.setEdgeSync(syncEdge, syncChanVar + syncChanId, false);
-						builder.setEdgeUpdate(syncEdge, isValidVar + " = " + ((toBeTrue) ? "true" : "false"));
+						builder.setEdgeUpdate(syncEdge, isActiveVar + " = " + ((toBeTrue) ? "true" : "false"));
 						builder.setEdgeSource(syncEdge, stateLocationMap.get(verticesOfRegionMatch.getVertex()));
 						// Ha belépésre engedélyezzük a régiót, akkor vizsgálni kell, hogy hova kössük a szinkornizációs él végpontját
 						if (toBeTrue) {
@@ -651,7 +651,7 @@ public class CommandHandler extends AbstractHandler {
 						}
 					}
 					builder.setEdgeSync(syncEdge, syncChanVar + (syncChanId), false);
-					builder.setEdgeUpdate(syncEdge, isValidVar + " = true");		
+					builder.setEdgeUpdate(syncEdge, isActiveVar + " = true");		
 				}
 			}
 			// Ha a target composite state, akkor ezt minden region-jére megismételjük, kivéve ezt a regiont
@@ -684,7 +684,7 @@ public class CommandHandler extends AbstractHandler {
 			builder.setEdgeTarget(ownSyncEdge, stateLocationMap.get(source));
 			builder.setEdgeSync(ownSyncEdge, syncChanVar + (syncChanId), true);
 			// Letiltjuk ezt a régiót, mert önmagára nem tud szinkronizálni
-			builder.setEdgeUpdate(ownSyncEdge, isValidVar + " = false");
+			builder.setEdgeUpdate(ownSyncEdge, isActiveVar + " = false");
 			builder.setEdgeComment(ownSyncEdge, "A Yakinduban magasabb absztrakcios szinten levo vertexbe vezeto el.");
 			// Ez az él felel majd meg a regionökön átívelõ transitionnek
 			transitionEdgeMap.put(transition, ownSyncEdge);
@@ -722,7 +722,7 @@ public class CommandHandler extends AbstractHandler {
 			builder.setEdgeSource(ownSyncEdge, stateLocationMap.get(source));
 			builder.setEdgeTarget(ownSyncEdge, stateLocationMap.get(source));
 			builder.setEdgeSync(ownSyncEdge, syncChanVar + (syncChanId), false);
-			builder.setEdgeUpdate(ownSyncEdge, isValidVar + " = false");
+			builder.setEdgeUpdate(ownSyncEdge, isActiveVar + " = false");
 			if (Helper.hasExitEvent(source)) {
 				for (StatesWithExitEventMatch statesWithExitEventMatch : matcher.getAllStatesWithExitEvent()) {
 					if (statesWithExitEventMatch.getState() == source) {
@@ -815,10 +815,10 @@ public class CommandHandler extends AbstractHandler {
 		for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : matcher.getAllTransitions()) {
 			// Rátesszük a guardokra a template érvényességi vátozót is
 			if (builder.getEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())) != null && builder.getEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())) != "") {
-				builder.setEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), isValidVar + " && " + builder.getEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())));
+				builder.setEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), isActiveVar + " && " + builder.getEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())));
 			} 
 			else {
-				builder.setEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), isValidVar);
+				builder.setEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), isActiveVar);
 			}		
 		}
 	}
