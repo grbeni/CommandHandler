@@ -31,9 +31,11 @@ pattern variableDefinitions(variable : VariableDefinition, name, isReadonly, typ
 }
 
 // Region-ök lekérése Entry-jükkel
-pattern entryOfRegions(regionName, region : Region, entry : Entry) {
+pattern entryOfRegions(regionName, region : Region, entry : Entry, transition : Transition, state : Vertex) {
 	Region.name(region, regionName);
 	Entry.parentRegion(entry, region);
+	Entry.outgoingTransitions(entry, transition);
+	Vertex.incomingTransitions(state, transition);
 }
 
 // Legfelsõ szintû regionök lekérése
@@ -136,6 +138,16 @@ pattern statesWithEntryEvent(state : State, parentRegion : Region, expression : 
 // Az ExitEventtel rendelkezõ state-ek effectjét adja vissza
 pattern statesWithExitEvent(state : State, transition : Transition, expression : Expression) {
 	State.outgoingTransitions(state, transition);
+	State.localReactions(state, reaction);
+	Reaction.trigger(reaction, trigger);
+	ReactionTrigger.triggers(trigger, exitEvent);
+	ExitEvent(exitEvent);
+	Reaction.effect(reaction, effect);
+	find reactionEffectToExpression(effect, expression);
+}
+
+// Az ExitEventtel rendelkezõ, de kimenõ éllel nem feltétlenül rendelkezõ state-ek effectjét adja vissza
+pattern statesWithExitEventWithoutOutgoingTransition(state : State, expression : Expression) {
 	State.localReactions(state, reaction);
 	Reaction.trigger(reaction, trigger);
 	ReactionTrigger.triggers(trigger, exitEvent);

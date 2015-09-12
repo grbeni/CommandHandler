@@ -278,7 +278,7 @@ public class CommandHandler extends AbstractHandler {
 		createTemplateValidityGuards();
 		
 		// Entry kimenõ élek beSyncelése
-		createSyncFromEtrys();
+		createSyncFromEntries();
 		
 		// After .. kifejezések transzformálása
 		createTimingEvents();
@@ -699,10 +699,10 @@ public class CommandHandler extends AbstractHandler {
 			builder.setEdgeSync(ownSyncEdge, syncChanVar + (syncChanId), false);
 			// Exit eventet rárakjuk, ha van
 			if (Helper.hasExitEvent(source)) {
-				for (StatesWithExitEventMatch statesWithExitEventMatch : matcher.getAllStatesWithExitEvent()) {
+				for (StatesWithExitEventWithoutOutgoingTransitionMatch statesWithExitEventMatch : matcher.getAllStatesWithExitEventWithoutOutgoing()) {
 					if (statesWithExitEventMatch.getState() == source) {
 						String effect = UppaalCodeGenerator.transformExpression(statesWithExitEventMatch.getExpression());
-						builder.setEdgeUpdate(ownSyncEdge, effect);
+						builder.setEdgeUpdate(ownSyncEdge, effect);						
 					}
 				}
 			}
@@ -724,10 +724,10 @@ public class CommandHandler extends AbstractHandler {
 			builder.setEdgeSync(ownSyncEdge, syncChanVar + (syncChanId), false);
 			builder.setEdgeUpdate(ownSyncEdge, isActiveVar + " = false");
 			if (Helper.hasExitEvent(source)) {
-				for (StatesWithExitEventMatch statesWithExitEventMatch : matcher.getAllStatesWithExitEvent()) {
+				for (StatesWithExitEventWithoutOutgoingTransitionMatch statesWithExitEventMatch : matcher.getAllStatesWithExitEventWithoutOutgoing()) {
 					if (statesWithExitEventMatch.getState() == source) {
 						String effect = UppaalCodeGenerator.transformExpression(statesWithExitEventMatch.getExpression());
-						builder.setEdgeUpdate(ownSyncEdge, effect);
+						builder.setEdgeUpdate(ownSyncEdge, effect);						
 					}
 				}
 			}
@@ -852,7 +852,7 @@ public class CommandHandler extends AbstractHandler {
 	 * @throws IncQueryException 
 	 * 
 	 */
-	private void createSyncFromEtrys() throws IncQueryException {
+	private void createSyncFromEntries() throws IncQueryException {
 		Map<State, String> hasSync = new HashMap<State, String>();
 		for (EdgesFromEntryOfParallelRegionsMatch edgesFromEntryOfParallelRegionsMatch : matcher.getEdgesFromEntryOfParallelRegions()) {
 			if (hasSync.containsKey(edgesFromEntryOfParallelRegionsMatch.getCompositeState())) {

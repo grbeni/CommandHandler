@@ -195,9 +195,9 @@ public class Helper {
 	 * @throws IncQueryException
 	 */
 	public static boolean hasExitEvent(Vertex state) throws IncQueryException {
-		for (StatesWithExitEventMatch statesWithExitEventMatch : matcher.getAllStatesWithExitEvent()) {
+		for (StatesWithExitEventWithoutOutgoingTransitionMatch statesWithExitEventMatch : matcher.getAllStatesWithExitEventWithoutOutgoing()) {
 			if (statesWithExitEventMatch.getState() == state) {
-				return true;
+				return true;				
 			}
 		}
 		return false;
