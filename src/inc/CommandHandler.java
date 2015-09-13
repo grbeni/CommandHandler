@@ -222,18 +222,12 @@ public class CommandHandler extends AbstractHandler {
 			regionTemplateMap.put(regionMatch.getRegion(), template);
 										   									
 			//Kiinduló állapotot beállítjuk									 
-			Location entryLocation = builder.createLocation(regionMatch.getEntry().getKind().getName(), template);									
-			template.setInit(entryLocation);
+			Location entryLocation = builder.createLocation(regionMatch.getEntry().getKind().getName(), template);
+			builder.setInitialLocation(entryLocation, template);
+			// Az entry node committed
+			builder.setLocationCommitted(entryLocation);
 			builder.setLocationComment(entryLocation, "Initial entry node");
-			// Az entry node legfelsõ szinten committed, alsóbb szinteken urgent, hogy ne legyen baj a deadlock-kal, ha committed állapotól kijövõ éleken van guard
-			if (Helper.isTopRegion(regionMatch.getRegion())) {
-				builder.setLocationCommitted(entryLocation);		
-			}
-			else {
-				// Ez nem tökéletes így, inkább valamiféle committed kéne, de az nem megvalósítható
-				//builder.setLocationUrgent(entryLocation);	
-			}
-			
+	
 			//Betesszük a kezdõállapotot a Map-be									 
 			stateLocationMap.put(regionMatch.getEntry(), entryLocation);
 		
@@ -416,7 +410,7 @@ public class CommandHandler extends AbstractHandler {
 			// Kivesszük a saját regionét
 			regionList.remove(exitNodesMatch.getRegion());
 			// Letiltjuk a régiókat
-			setAllRegionsWithSync(false, regionList);
+			setAllRegionsWithSync(false, false, regionList);
 		}
 	}
 	
@@ -497,7 +491,7 @@ public class CommandHandler extends AbstractHandler {
 			Edge entryEdge = hasEntryLoc.get(compositeStateMatch.getCompositeState());
 			builder.setEdgeSync(entryEdge, syncChanVar + (syncChanId), true);
 			// Minden eggyel alatti régióban létrehozzuk a szükséges ? sync-eket
-			setAllRegionsWithSync(true, compositeStateMatch.getCompositeState().getRegions());
+			setAllRegionsWithSync(true, true, compositeStateMatch.getCompositeState().getRegions());
 		}
 	}
 	
@@ -521,7 +515,7 @@ public class CommandHandler extends AbstractHandler {
 			// Letiltjuk az összes alatta lévõ region-t
 			List<Region> subregionList = new ArrayList<Region>();
 			Helper.addAllSubregionsToRegionList(compositeStateMatch.getCompositeState(), subregionList);
-			setAllRegionsWithSync(false, subregionList);			
+			setAllRegionsWithSync(false, false, subregionList);			
 		}
 	}
 	
@@ -532,13 +526,22 @@ public class CommandHandler extends AbstractHandler {
 	 * @param regionList Yakindu regionök listája, amelyeken létre szeretnénk hozni a ? csatornákat az update-ekkel.
 	 * @throws IncQueryException 
 	 */
-	private void setAllRegionsWithSync(boolean toBeTrue, List<Region> regionList) throws IncQueryException {
+	private void setAllRegionsWithSync(boolean toBeTrue, boolean needInit, List<Region> regionList) throws IncQueryException {
 		for (Region subregion : regionList) {
+			if (needInit) {
+				Location initLocation = builder.createLocation("Init", regionTemplateMap.get(subregion));
+				Edge syncEdge = builder.createEdge(regionTemplateMap.get(subregion));
+				builder.setEdgeSync(syncEdge, syncChanVar + syncChanId, false);
+				builder.setEdgeUpdate(syncEdge, isActiveVar + " = " + ((toBeTrue) ? "true" : "false"));
+				builder.setEdgeSource(syncEdge, initLocation);
+				builder.setEdgeTarget(syncEdge, stateLocationMap.get(Helper.getEntryOfRegion(subregion)));
+				builder.setInitialLocation(initLocation, regionTemplateMap.get(subregion));
+			}			
 			for (VerticesOfRegionsMatch verticesOfRegionMatch : matcher.getAllVerticesOfRegions()) {
 				// Az adott subregion vertexeit vizsgáljuk
 				if (verticesOfRegionMatch.getRegion() == subregion) {
 					// Choice-okból nem csinálunk magukba éleket, azokban elvileg nem tartózkodhatunk
-					if (!(Helper.isChoice(verticesOfRegionMatch.getVertex()))) {
+					if (!(Helper.isChoice(verticesOfRegionMatch.getVertex())) && !(Helper.isEntry(verticesOfRegionMatch.getVertex()))) {
 						Edge syncEdge = builder.createEdge(regionTemplateMap.get(subregion));
 						builder.setEdgeSync(syncEdge, syncChanVar + syncChanId, false);
 						builder.setEdgeUpdate(syncEdge, isActiveVar + " = " + ((toBeTrue) ? "true" : "false"));
@@ -631,7 +634,7 @@ public class CommandHandler extends AbstractHandler {
 			if (Helper.isCompositeState(target)) {
 				List<Region> pickedSubregions = new ArrayList<Region>(((State) target).getRegions()); // Talán addAll kéne?
 				pickedSubregions.removeAll(visitedRegions);
-				setAllRegionsWithSync(true, pickedSubregions);				
+				setAllRegionsWithSync(true, false, pickedSubregions);				
 			}
 		}
 		// Ha nem a legfölsõ szinten vagyunk, akkor létrehozzuk a ? szinkronizációs éleket minden állapotból a megfelelõ állapotba
@@ -658,7 +661,7 @@ public class CommandHandler extends AbstractHandler {
 			if (Helper.isCompositeState(target)) {
 				List<Region> pickedSubregions = new ArrayList<Region>(((State) target).getRegions()); // Talán addAll kéne?
 				pickedSubregions.removeAll(visitedRegions);
-				setAllRegionsWithSync(true, pickedSubregions);				
+				setAllRegionsWithSync(true, false, pickedSubregions);				
 			}
 		}		
 	}
@@ -712,7 +715,7 @@ public class CommandHandler extends AbstractHandler {
 			State sourceState = (State) source;
 			Helper.addAllSubregionsToRegionList(sourceState, subregionList);
 			subregionList.removeAll(visitedRegions);
-			setAllRegionsWithSync(false, subregionList);
+			setAllRegionsWithSync(false, false, subregionList);
 			return;
 		}
 		// Közbülsõ szinteken csak kézzel létrehozzuk a sync éleket, letiltjuk a régiót, és rájuk írjuk az exit expressiont, ha van

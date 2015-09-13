@@ -118,6 +118,21 @@ public class Helper {
 	}
 	
 	/**
+	 * Ez a metódus eldönti, hogy a megadott Yakindu vertex entry-e.
+	 * @param vertex Yakindu vertex, amelyrõl el szeretnénk dönteni, hogy entry-e.
+	 * @return Entry-e vagy nem.
+	 * @throws IncQueryException
+	 */
+	public static boolean isEntry(Vertex vertex) throws IncQueryException {
+		for (EntryOfRegionsMatch entryMatch : matcher.getAllRegionsWithEntry()) {
+			if (entryMatch.getEntry() == vertex) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	/**
 	 * Ez a metódus eldönti, hogy a megadott Yakindu region legfelsõ szintû-e.
 	 * @param region Yakindu region, amelyrõl el szeretnénk dönteni, hogy top szintû-e.
 	 * @return Top szintû-e vagy nem.
