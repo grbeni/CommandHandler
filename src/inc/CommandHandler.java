@@ -76,6 +76,9 @@ public class CommandHandler extends AbstractHandler {
 			
 	// Egy Map a Yakindu:Transition -> UPPAAL:Edge leképzésre
 	private Map<Vertex, Edge> hasExitLoc = null;
+	
+	// Egy Map, amely tárolja az altemplate-ek "initial location"-jét
+	private Map<Template, Location> hasInitLoc = null;
 			
 	// Szinkronizációs csatornák létrehozására
 	private int syncChanId = 0;
@@ -124,6 +127,7 @@ public class CommandHandler extends AbstractHandler {
 									transitionEdgeMap = new HashMap<Transition, Edge>();
 									hasEntryLoc = new HashMap<Vertex, Edge>();
 									hasExitLoc = new HashMap<Vertex, Edge>();
+									hasInitLoc = new HashMap<Template, Location>();
 									
 									// ID változók resetelése
 									syncChanId = 0;
@@ -536,6 +540,7 @@ public class CommandHandler extends AbstractHandler {
 				builder.setEdgeSource(syncEdge, initLocation);
 				builder.setEdgeTarget(syncEdge, stateLocationMap.get(Helper.getEntryOfRegion(subregion)));
 				builder.setInitialLocation(initLocation, regionTemplateMap.get(subregion));
+				hasInitLoc.put(regionTemplateMap.get(subregion), initLocation);
 			}			
 			for (VerticesOfRegionsMatch verticesOfRegionMatch : matcher.getAllVerticesOfRegions()) {
 				// Az adott subregion vertexeit vizsgáljuk
@@ -656,6 +661,15 @@ public class CommandHandler extends AbstractHandler {
 					builder.setEdgeSync(syncEdge, syncChanVar + (syncChanId), false);
 					builder.setEdgeUpdate(syncEdge, isActiveVar + " = true");		
 				}
+			}
+			// Altemplate "initial location"-jét is bekötjük a megfelelõ locationbe
+			System.out.println("asd");
+			if (hasInitLoc.containsKey(regionTemplateMap.get(target.getParentRegion()))) {
+				Edge syncEdge = builder.createEdge(regionTemplateMap.get(target.getParentRegion()));
+				builder.setEdgeSource(syncEdge, hasInitLoc.get(regionTemplateMap.get(target.getParentRegion())));
+				builder.setEdgeTarget(syncEdge, stateLocationMap.get(target));	
+				builder.setEdgeSync(syncEdge, syncChanVar + (syncChanId), false);
+				builder.setEdgeUpdate(syncEdge, isActiveVar + " = true");	
 			}
 			// Ha a target composite state, akkor ezt minden region-jére megismételjük, kivéve ezt a regiont
 			if (Helper.isCompositeState(target)) {
