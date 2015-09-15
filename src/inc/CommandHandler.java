@@ -77,7 +77,7 @@ public class CommandHandler extends AbstractHandler {
 	private Map<Vertex, Edge> hasEntryLoc = null;
 	
 	// Egy Map, amely tárolja az egyes Vertexek triggerLocation kimenõ élét
-	private Map<Vertex, Edge> hasTriggerLoc = null;
+	private Map<Transition, Edge> hasTriggerPlusEdge = null;
 			
 	// Egy Map a Yakindu:Transition -> UPPAAL:Edge leképzésre
 	private Map<Vertex, Edge> hasExitLoc = null;
@@ -131,7 +131,7 @@ public class CommandHandler extends AbstractHandler {
 									stateLocationMap = new HashMap<Vertex, Location>();
 									transitionEdgeMap = new HashMap<Transition, Edge>();
 									hasEntryLoc = new HashMap<Vertex, Edge>();
-									hasTriggerLoc = new HashMap<Vertex, Edge>(hasEntryLoc);
+									hasTriggerPlusEdge = new HashMap<Transition, Edge>();
 									hasExitLoc = new HashMap<Vertex, Edge>();
 									hasInitLoc = new HashMap<Template, Location>();
 									
@@ -905,6 +905,10 @@ public class CommandHandler extends AbstractHandler {
 		}
 	}
 	
+	/**
+	 * Ez a metódus létrehozza a triggereket, és a hozzá szükséges új locationöket és edge-eket a megfelelõ template-ekben. 
+	 * @throws IncQueryException
+	 */
 	private void createControlTemplate() throws IncQueryException {
 		Template controlTemplate = builder.createTemplate("controlTemplate");
 		Location controlLocation = builder.createLocation("triggerLocation", controlTemplate);
@@ -929,6 +933,7 @@ public class CommandHandler extends AbstractHandler {
 				builder.setEdgeSync(syncEdge, transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization());
 				builder.setEdgeTarget(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), triggerLocation);
 				builder.setEdgeSync(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), triggerOfTransitionMatch.getTriggerName(), false);
+				hasTriggerPlusEdge.put(triggerOfTransitionMatch.getTransition(), syncEdge);
 			}
 			else {
 				builder.setEdgeSync(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), triggerOfTransitionMatch.getTriggerName(), false);
