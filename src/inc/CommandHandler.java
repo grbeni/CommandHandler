@@ -7,8 +7,10 @@ import hu.bme.mit.inf.alf.uppaal.transformation.serialization.UppaalModelSeriali
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.eclipse.core.commands.AbstractHandler;
 import org.eclipse.core.commands.ExecutionEvent;
@@ -73,6 +75,9 @@ public class CommandHandler extends AbstractHandler {
 			
 	// Egy Map a Yakindu:Transition -> UPPAAL:Edge leképzésre
 	private Map<Vertex, Edge> hasEntryLoc = null;
+	
+	// Egy Map, amely tárolja az egyes Vertexek triggerLocation kimenõ élét
+	private Map<Vertex, Edge> hasTriggerLoc = null;
 			
 	// Egy Map a Yakindu:Transition -> UPPAAL:Edge leképzésre
 	private Map<Vertex, Edge> hasExitLoc = null;
@@ -126,6 +131,7 @@ public class CommandHandler extends AbstractHandler {
 									stateLocationMap = new HashMap<Vertex, Location>();
 									transitionEdgeMap = new HashMap<Transition, Edge>();
 									hasEntryLoc = new HashMap<Vertex, Edge>();
+									hasTriggerLoc = new HashMap<Vertex, Edge>(hasEntryLoc);
 									hasExitLoc = new HashMap<Vertex, Edge>();
 									hasInitLoc = new HashMap<Template, Location>();
 									
@@ -138,7 +144,10 @@ public class CommandHandler extends AbstractHandler {
 									createVariables();
 									
 									// Template-ek létrehozása
-									createTemplates();																											
+									createTemplates();	
+									
+									// Triggerek felvétele
+									createControlTemplate();
 																											
 									// Felépíti az UPPAAL modellt a berakott elemekbõl
 									builder.buildModel();
@@ -663,7 +672,6 @@ public class CommandHandler extends AbstractHandler {
 				}
 			}
 			// Altemplate "initial location"-jét is bekötjük a megfelelõ locationbe
-			System.out.println("asd");
 			if (hasInitLoc.containsKey(regionTemplateMap.get(target.getParentRegion()))) {
 				Edge syncEdge = builder.createEdge(regionTemplateMap.get(target.getParentRegion()));
 				builder.setEdgeSource(syncEdge, hasInitLoc.get(regionTemplateMap.get(target.getParentRegion())));
@@ -886,14 +894,45 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
+	 * Ez a metódus hozza létre az egyes Yakundu kimeneti éleken szereplõ idõfüggõ viselkedésnek megfelelõ (after 1 s) Uppaal clock változók manipulálását.
 	 * @throws IncQueryException 
-	 * 
 	 */
 	private void createTimingEvents() throws IncQueryException {
 		for (EdgesWithTimeTriggerMatch edgesWithTimeTriggerMatch : matcher.getEdgesWithTimeTrigger()) {
 			builder.setEdgeUpdate(transitionEdgeMap.get(edgesWithTimeTriggerMatch.getIncomingTransition()), clockVar + " = 0");
 			builder.setLocationInvariant(stateLocationMap.get(edgesWithTimeTriggerMatch.getSource()), clockVar + " <= " + UppaalCodeGenerator.transformExpression(edgesWithTimeTriggerMatch.getValue()));
 			builder.setEdgeGuard(transitionEdgeMap.get(edgesWithTimeTriggerMatch.getTriggerTransition()), clockVar + " >= " + UppaalCodeGenerator.transformExpression(edgesWithTimeTriggerMatch.getValue()));
+		}
+	}
+	
+	private void createControlTemplate() throws IncQueryException {
+		Template controlTemplate = builder.createTemplate("controlTemplate");
+		Location controlLocation = builder.createLocation("triggerLocation", controlTemplate);
+		builder.setInitialLocation(controlLocation, controlTemplate);
+		Set<String> triggerNames = new HashSet<String>();
+		int id = 0;
+		for (TriggerOfTransitionMatch triggerOfTransitionMatch : matcher.getAllTriggersOfTransitions()) {			
+			if (!triggerNames.contains(triggerOfTransitionMatch.getTriggerName())) {
+				Edge ownTriggerEdge = builder.createEdge(controlTemplate);
+				builder.setEdgeSource(ownTriggerEdge, controlLocation);
+				builder.setEdgeTarget(ownTriggerEdge, controlLocation);
+				builder.addGlobalDeclaration("broadcast chan " + triggerOfTransitionMatch.getTriggerName() + ";");
+				triggerNames.add(triggerOfTransitionMatch.getTriggerName());
+				builder.setEdgeSync(ownTriggerEdge, triggerOfTransitionMatch.getTriggerName(), true);
+			}
+			if (transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization() != null) {
+				Location triggerLocation = builder.createLocation("triggerLocation" + (++id), regionTemplateMap.get(triggerOfTransitionMatch.getParentRegion()));
+				builder.setLocationCommitted(triggerLocation);
+				Edge syncEdge = builder.createEdge(regionTemplateMap.get(triggerOfTransitionMatch.getParentRegion()));
+				builder.setEdgeSource(syncEdge, triggerLocation);
+				builder.setEdgeTarget(syncEdge, builder.getEdgeTarget(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition())));
+				builder.setEdgeSync(syncEdge, transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization());
+				builder.setEdgeTarget(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), triggerLocation);
+				builder.setEdgeSync(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), triggerOfTransitionMatch.getTriggerName(), false);
+			}
+			else {
+				builder.setEdgeSync(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), triggerOfTransitionMatch.getTriggerName(), false);
+			}
 		}
 	}
 	

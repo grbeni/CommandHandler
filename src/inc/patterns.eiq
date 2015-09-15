@@ -199,3 +199,13 @@ pattern edgesWithTimeTrigger(incomingTransition : Transition, triggerTransition 
 	ReactionTrigger.triggers(reactionTrigger, trigger);
 	TimeEventSpec.value(trigger, value);
 }
+
+// Triggerrel rendelkezõ transitionöket szedi le
+pattern triggerOfTransition(transition : Transition, parentRegion : Region, triggerName) {
+	Transition.source.parentRegion(transition, parentRegion);
+	Transition.trigger(transition, trigger);
+	ReactionTrigger.triggers(trigger, aTrigger);
+	RegularEventSpec.event(aTrigger, event);
+	FeatureCall.feature(event, feature);
+	EventDefinition.name(feature, triggerName);
+}

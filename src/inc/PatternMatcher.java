@@ -173,4 +173,8 @@ public class PatternMatcher {
 		return EdgesWithTimeTriggerMatcher.on(engine).getAllMatches();
 	}
 	
+	public Collection<TriggerOfTransitionMatch> getAllTriggersOfTransitions() throws IncQueryException {
+		return TriggerOfTransitionMatcher.on(engine).getAllMatches();
+	}
+	
 }
