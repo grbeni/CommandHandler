@@ -209,3 +209,16 @@ pattern triggerOfTransition(transition : Transition, parentRegion : Region, trig
 	FeatureCall.feature(event, feature);
 	EventDefinition.name(feature, triggerName);
 }
+
+pattern transitionWithoutTrigger(transition : Transition) {
+	Transition.trigger(transition, _trigger);
+}
+
+
+// Leszedi az exitNode-ok szinkornizációjához szükséges objektumokat
+pattern exitNodeSync(exitNode : Exit, exitNodeTransition : Transition, defaultTransition : Transition) {
+	Exit.incomingTransitions(exitNode, exitNodeTransition);
+	Exit.parentRegion.composite(exitNode, parentState);
+	State.outgoingTransitions(parentState, defaultTransition);
+	neg find transitionWithoutTrigger(defaultTransition);
+}

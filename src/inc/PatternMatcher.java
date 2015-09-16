@@ -177,4 +177,8 @@ public class PatternMatcher {
 		return TriggerOfTransitionMatcher.on(engine).getAllMatches();
 	}
 	
+	public Collection<ExitNodeSyncMatch> getAllExitNodeSyncs() throws IncQueryException {
+		return ExitNodeSyncMatcher.on(engine).getAllMatches();
+	}
+	
 }
