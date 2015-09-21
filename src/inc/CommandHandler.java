@@ -38,10 +38,7 @@ import de.uni_paderborn.uppaal.templates.Template;
 /**
  * Az osztály, amely a Yakindu példánymodell alapján létrehozza az UPPAAL példánymodellt.
  * Függ a PatternMatcher és az UppaalModelBuilder osztályoktól.
- * @author Graics Bence 
- * Kell még:
- * -Synchronization node?
- * -Idõmérés?
+ * @author Graics Bence
  * 
  * Location-ök:
  *  - vertexekbõl
@@ -58,7 +55,8 @@ public class CommandHandler extends AbstractHandler {
 	private final String syncChanVar = "syncChan";
 	private final String isActiveVar = "isActive";
 	private final String clockVar = "Timer";
-			
+	private final String endVar = "end";
+
 	// Az IncQuery illeszkedések lekérésére
 	private PatternMatcher matcher = null;
 			
@@ -133,6 +131,11 @@ public class CommandHandler extends AbstractHandler {
 									// ID változók resetelése
 									syncChanId = 0;
 									entryStateId = 0;
+									
+									// Csak akkor szennyezzük az Uppaal modellt end változóval, ha van final state a Yakindu modellben
+									if (Helper.hasFinalState()) {
+										builder.addGlobalDeclaration("bool " + endVar + " = false;" );
+									}
 									
 									// Változók berakása
 									createVariables();
@@ -254,6 +257,9 @@ public class CommandHandler extends AbstractHandler {
 			createEdges(regionMatch.getRegion(), template);			
 		}	
 		
+		// Final state bemenõ edge-einek updateinek megadása
+		createFinalStateEdgeUpdates();
+		
 		// Exit node-ok syncjeinek létrehozása
 		createUpdatesForExitNodes();
 		
@@ -349,6 +355,16 @@ public class CommandHandler extends AbstractHandler {
 				stateLocationMap.put(finalStateMatch.getFinalState(), aLocation); // A final state-location párokat betesszük a map-be	
 				builder.setLocationComment(aLocation, "A final state");
 			}
+		}
+	}
+	
+	/**
+	 * Ez a metódus létrehozza a final state bemenõ élén az end = false update-eket, ami letilt minden tranziciót.
+	 * @throws IncQueryException
+	 */
+	private void createFinalStateEdgeUpdates() throws IncQueryException {
+		for (FinalStateEdgeMatch finalStateEdgeMatch : matcher.getAllFinalStateEdges()) {
+			builder.setEdgeUpdate(transitionEdgeMap.get(finalStateEdgeMatch.getIncomingEdge()), endVar + " = true");
 		}
 	}
 	
@@ -827,10 +843,10 @@ public class CommandHandler extends AbstractHandler {
 		for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : matcher.getAllTransitions()) {
 			// Rátesszük a guardokra a template érvényességi vátozót is
 			if (builder.getEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())) != null && builder.getEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())) != "") {
-				builder.setEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), isActiveVar + " && " + builder.getEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())));
+				builder.setEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), ((Helper.hasFinalState()) ? ("!" + endVar + " && ") : "") + isActiveVar + " && " + builder.getEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())));
 			} 
 			else {
-				builder.setEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), isActiveVar);
+				builder.setEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), ((Helper.hasFinalState()) ? ("!" + endVar + " && ") : "") + isActiveVar);
 			}		
 		}
 	}

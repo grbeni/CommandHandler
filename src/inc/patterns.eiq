@@ -70,6 +70,10 @@ pattern finalStates(finalState : FinalState, region : Region) {
 	FinalState.parentRegion(finalState, region);
 }
 
+pattern finalStateEdge(incomingEdge : Transition) {
+	FinalState.incomingTransitions(_finalState, incomingEdge);
+}
+
 // Összetettebb patternek, amelyeket késõbb hoztam létre
 
 // Azonos regionben lévõ vertexek közötti transitionöket adja vissza

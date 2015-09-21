@@ -218,4 +218,16 @@ public class Helper {
 		return false;
 	}
 	
+	/**
+	 * Ez a metódus eldönti, hogy van-e final state a Yakindu modellben.
+	 * @return Talált-e final state-et vagy nem.
+	 * @throws IncQueryException
+	 */
+	public static boolean hasFinalState() throws IncQueryException {
+		for (@SuppressWarnings("unused") FinalStatesMatch finalStatesMatch : matcher.getAllFinalStates()) {
+			return true;
+		}
+		return false;
+	}
+	
 }

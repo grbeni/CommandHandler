@@ -105,6 +105,10 @@ public class PatternMatcher {
 		return FinalStatesMatcher.on(engine).getAllMatches();
 	}
 	
+	public Collection<FinalStateEdgeMatch> getAllFinalStateEdges() throws IncQueryException {
+		return FinalStateEdgeMatcher.on(engine).getAllMatches();
+	}
+	
 	public Collection<ExitNodesMatch> getAllExitNodes() throws IncQueryException {
 		return ExitNodesMatcher.on(engine).getAllMatches();
 	}
