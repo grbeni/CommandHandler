@@ -1,7 +1,23 @@
 package inc;
 
-import java.util.List;
+import inc.util.ChoicesQuerySpecification;
+import inc.util.CompositeStatesQuerySpecification;
+import inc.util.EntryOfRegionsQuerySpecification;
+import inc.util.FinalStatesQuerySpecification;
+import inc.util.RegionsOfCompositeStatesQuerySpecification;
+import inc.util.StatesQuerySpecification;
+import inc.util.StatesWithEntryEventQuerySpecification;
+import inc.util.StatesWithExitEventWithoutOutgoingTransitionQuerySpecification;
+import inc.util.TopRegionsQuerySpecification;
+import inc.util.VerticesOfRegionsQuerySpecification;
 
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import org.eclipse.incquery.runtime.api.IncQueryEngine;
+import org.eclipse.incquery.runtime.api.impl.RunOnceQueryEngine;
 import org.eclipse.incquery.runtime.exception.IncQueryException;
 import org.yakindu.sct.model.sgraph.Entry;
 import org.yakindu.sct.model.sgraph.Region;
@@ -16,10 +32,12 @@ import org.yakindu.sct.model.sgraph.Vertex;
  */
 public class Helper {
 
-	private static PatternMatcher matcher = null;
+	private static IncQueryEngine engine;
+	private static RunOnceQueryEngine runOnceQueryEngine;
 	
-	public static void setMatcher(PatternMatcher givenMatcher) {
-		matcher = givenMatcher;
+	public static void setEngine(IncQueryEngine engine, RunOnceQueryEngine runOnceQueryEngine) {
+		Helper.engine = engine;
+		Helper.runOnceQueryEngine = runOnceQueryEngine;		
 	}
 	
 	/**
@@ -29,10 +47,12 @@ public class Helper {
 	 * @throws IncQueryException 
 	 */
 	public static void addAllSubregionsToRegionList(State state, List<Region> regionList) throws IncQueryException {
-		for (RegionsOfCompositeStatesMatch regionsOfCompositeStateMatch : matcher.getAllRegionsOfCompositeStates()) {
+		RegionsOfCompositeStatesMatcher compositeStateMatcher = engine.getMatcher(RegionsOfCompositeStatesQuerySpecification.instance());
+		VerticesOfRegionsMatcher verticesOfRegionsMatcher = engine.getMatcher(VerticesOfRegionsQuerySpecification.instance());
+		for (RegionsOfCompositeStatesMatch regionsOfCompositeStateMatch : compositeStateMatcher.getAllMatches()) {
 			if (regionsOfCompositeStateMatch.getCompositeState() == state) {
 				regionList.add(regionsOfCompositeStateMatch.getSubregion());
-				for (VerticesOfRegionsMatch verticesOfRegionsMatch : matcher.getAllVerticesOfRegions()) {
+				for (VerticesOfRegionsMatch verticesOfRegionsMatch : verticesOfRegionsMatcher.getAllMatches()) {
 					if (verticesOfRegionsMatch.getRegion() == regionsOfCompositeStateMatch.getSubregion() && (isCompositeState(verticesOfRegionsMatch.getVertex()))) {
 						addAllSubregionsToRegionList((State) verticesOfRegionsMatch.getVertex(), regionList);
 					}
@@ -52,7 +72,8 @@ public class Helper {
 			return false;
 		}
 		else {
-			for (RegionsOfCompositeStatesMatch regionsOfCompositeStateMatch : matcher.getAllRegionsOfCompositeStates()) {
+			RegionsOfCompositeStatesMatcher regionsOfCompositeStatesMatcher = engine.getMatcher(RegionsOfCompositeStatesQuerySpecification.instance());
+			for (RegionsOfCompositeStatesMatch regionsOfCompositeStateMatch : regionsOfCompositeStatesMatcher.getAllMatches()) {
 				if (regionsOfCompositeStateMatch.getSubregion() == region) {
 					return ((getEntryOfRegion(regionsOfCompositeStateMatch.getParentRegion()).getKind().getValue() == 2) || hasDeepHistoryAbove(regionsOfCompositeStateMatch.getParentRegion()));
 				}
@@ -79,7 +100,8 @@ public class Helper {
 	 * @throws IncQueryException 
 	 */
 	public static Entry getEntryOfRegion(Region region) throws IncQueryException {
-		for (EntryOfRegionsMatch entryOfRegionsMatch : matcher.getAllRegionsWithEntry()) {
+		EntryOfRegionsMatcher entryOfRegionsMatcher = engine.getMatcher(EntryOfRegionsQuerySpecification.instance());
+		for (EntryOfRegionsMatch entryOfRegionsMatch : entryOfRegionsMatcher.getAllMatches()) {
 			if (entryOfRegionsMatch.getRegion() == region) {
 				return entryOfRegionsMatch.getEntry();
 			}
@@ -94,7 +116,8 @@ public class Helper {
 	 * @throws IncQueryException
 	 */
 	public static boolean isCompositeState(Vertex vertex) throws IncQueryException {
-		for (CompositeStatesMatch compositeStatesMatch : matcher.getAllCompositeStates()) {
+		CompositeStatesMatcher compositeStatesMatcher = engine.getMatcher(CompositeStatesQuerySpecification.instance());
+		for (CompositeStatesMatch compositeStatesMatch : compositeStatesMatcher.getAllMatches()) {
 			if (compositeStatesMatch.getCompositeState() == vertex) {
 				return true;
 			}
@@ -109,7 +132,8 @@ public class Helper {
 	 * @throws IncQueryException
 	 */
 	public static boolean isChoice(Vertex vertex) throws IncQueryException {
-		for (ChoicesMatch choicesMatch : matcher.getAllChoices()) {
+		ChoicesMatcher choicesMatcher = engine.getMatcher(ChoicesQuerySpecification.instance());
+		for (ChoicesMatch choicesMatch : choicesMatcher.getAllMatches()) {
 			if (choicesMatch.getChoice() == vertex) {
 				return true;
 			}
@@ -124,7 +148,8 @@ public class Helper {
 	 * @throws IncQueryException
 	 */
 	public static boolean isEntry(Vertex vertex) throws IncQueryException {
-		for (EntryOfRegionsMatch entryMatch : matcher.getAllRegionsWithEntry()) {
+		EntryOfRegionsMatcher entryOfRegionsMatcher = engine.getMatcher(EntryOfRegionsQuerySpecification.instance());
+		for (EntryOfRegionsMatch entryMatch : entryOfRegionsMatcher.getAllMatches()) {
 			if (entryMatch.getEntry() == vertex) {
 				return true;
 			}
@@ -139,7 +164,8 @@ public class Helper {
 	 * @throws IncQueryException
 	 */
 	public static boolean isTopRegion(Region region) throws IncQueryException {
-		for (TopRegionsMatch topRegionMatch : matcher.getAllTopRegions()) {
+		TopRegionsMatcher topRegionsMatcher = engine.getMatcher(TopRegionsQuerySpecification.instance());
+		for (TopRegionsMatch topRegionMatch : topRegionsMatcher.getAllMatches()) {
 			if (topRegionMatch.getRegion() == region) {
 				return true;
 			}
@@ -155,13 +181,15 @@ public class Helper {
 	 * @throws IncQueryException 
 	 */
 	public static int getLevelOfVertex(Vertex vertex) throws IncQueryException {
-		for (VerticesOfRegionsMatch verticesOfRegionsMatch : matcher.getAllVerticesOfRegions()) {
+		VerticesOfRegionsMatcher verticesOfRegionsMatcher = engine.getMatcher(VerticesOfRegionsQuerySpecification.instance());
+		RegionsOfCompositeStatesMatcher regionsOfCompositeStatesMatcher = engine.getMatcher(RegionsOfCompositeStatesQuerySpecification.instance());
+		for (VerticesOfRegionsMatch verticesOfRegionsMatch : verticesOfRegionsMatcher.getAllMatches()) {
 			if (verticesOfRegionsMatch.getVertex() == vertex) {
 				if (Helper.isTopRegion(verticesOfRegionsMatch.getRegion())) {
 					return 0;
 				}
 				else {
-					for (RegionsOfCompositeStatesMatch regionsOfCompositeStatesMatch : matcher.getAllRegionsOfCompositeStates()) {
+					for (RegionsOfCompositeStatesMatch regionsOfCompositeStatesMatch : regionsOfCompositeStatesMatcher.getAllMatches()) {
 						if (regionsOfCompositeStatesMatch.getSubregion() == verticesOfRegionsMatch.getRegion()) {
 							return (getLevelOfVertex(regionsOfCompositeStatesMatch.getCompositeState()) + 1);
 						}
@@ -195,7 +223,8 @@ public class Helper {
 	 * @throws IncQueryException
 	 */
 	public static boolean hasEntryEvent(Vertex state) throws IncQueryException {
-		for (StatesWithEntryEventMatch statesWithEntryEventMatch : matcher.getAllStatesWithEntryEvent()) {
+		StatesWithEntryEventMatcher statesWithEntryEventMatcher = engine.getMatcher(StatesWithEntryEventQuerySpecification.instance());
+		for (StatesWithEntryEventMatch statesWithEntryEventMatch : statesWithEntryEventMatcher.getAllMatches()) {
 			if (statesWithEntryEventMatch.getState() == state) {
 				return true;
 			}
@@ -210,7 +239,10 @@ public class Helper {
 	 * @throws IncQueryException
 	 */
 	public static boolean hasExitEvent(Vertex state) throws IncQueryException {
-		for (StatesWithExitEventWithoutOutgoingTransitionMatch statesWithExitEventMatch : matcher.getAllStatesWithExitEventWithoutOutgoing()) {
+		StatesWithExitEventWithoutOutgoingTransitionMatcher statesWithExitEventWithoutOutgoingTransitionMatcher = 
+				engine.getMatcher(StatesWithExitEventWithoutOutgoingTransitionQuerySpecification.instance());
+		for (StatesWithExitEventWithoutOutgoingTransitionMatch statesWithExitEventMatch : 
+			statesWithExitEventWithoutOutgoingTransitionMatcher.getAllMatches()) {
 			if (statesWithExitEventMatch.getState() == state) {
 				return true;				
 			}
@@ -224,10 +256,34 @@ public class Helper {
 	 * @throws IncQueryException
 	 */
 	public static boolean hasFinalState() throws IncQueryException {
-		for (@SuppressWarnings("unused") FinalStatesMatch finalStatesMatch : matcher.getAllFinalStates()) {
+		FinalStatesMatcher finalStatesMatcher = engine.getMatcher(FinalStatesQuerySpecification.instance());
+		for (@SuppressWarnings("unused") FinalStatesMatch finalStatesMatch : finalStatesMatcher.getAllMatches()) {
 			return true;
 		}
 		return false;
+	}
+
+	public static String getTemplateNameFromRegionName(Region region) throws IncQueryException {
+		if (isTopRegion(region)) {
+			return (region.getName() + "OfStatechart").replaceAll(" ", "");			
+		}
+		else {
+			return  (region.getName() + "Of" + ((State)region.getComposite()).getName()).replaceAll(" ", "");
+		}
+	}
+	
+	public static String getExpressionFromStateName(State state) throws IncQueryException {
+		final String process = "Process_";		
+		return process + getTemplateNameFromRegionName(state.getParentRegion()) + "." + state.getName();
+	}
+
+	public static Collection<String> getNamesOfLocations() throws IncQueryException {
+		StatesMatcher statesMatcher = engine.getMatcher(StatesQuerySpecification.instance());
+		Set<String> locationNames = new HashSet<String>();
+		for (StatesMatch stateMatch : statesMatcher.getAllMatches()) {
+			locationNames.add(getExpressionFromStateName(stateMatch.getState()));
+		}
+		return locationNames;
 	}
 	
 }

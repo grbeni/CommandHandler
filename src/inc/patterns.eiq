@@ -189,12 +189,14 @@ pattern edgesWithTriggerElementReference(transition : Transition, element){
 	ElementReferenceExpression.reference(event, element);
 }
 
+// Adott composite state regionjeiben az entry node-ból kimenõ éleket adja vissza
 pattern edgesFromEntryOfParallelRegions(compositeState : State, transition : Transition) {
 	State.regions(compositeState, region);
 	Region.vertices(region, entry);
 	Entry.outgoingTransitions(entry, transition);
 }
 
+// Azokat az éleket adja vissza, amelyeknek van idõre vonatkozó triggere (after .. sec)
 pattern edgesWithTimeTrigger(incomingTransition : Transition, triggerTransition : Transition, value : Expression, source : Vertex, parentRegion : Region) {
 	Vertex.incomingTransitions(source, incomingTransition);
 	Vertex.parentRegion(source, parentRegion);
@@ -214,15 +216,15 @@ pattern triggerOfTransition(transition : Transition, parentRegion : Region, trig
 	EventDefinition.name(feature, triggerName);
 }
 
-pattern transitionWithoutTrigger(transition : Transition) {
+pattern transitionWithTrigger(transition : Transition) {
 	Transition.trigger(transition, _trigger);
 }
 
-
 // Leszedi az exitNode-ok szinkornizációjához szükséges objektumokat
-pattern exitNodeSync(exitNode : Exit, exitNodeTransition : Transition, defaultTransition : Transition) {
+pattern exitNodeSync(exitNode : Exit, parentState : State, parentRegion : Region, exitNodeTransition : Transition, defaultTransition : Transition) {
 	Exit.incomingTransitions(exitNode, exitNodeTransition);
 	Exit.parentRegion.composite(exitNode, parentState);
+	Exit.parentRegion(exitNode, parentRegion);
 	State.outgoingTransitions(parentState, defaultTransition);
-	neg find transitionWithoutTrigger(defaultTransition);
+	neg find transitionWithTrigger(defaultTransition);
 }

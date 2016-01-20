@@ -3,6 +3,26 @@ package inc;
 import hu.bme.mit.inf.alf.uppaal.transformation.UppaalModelBuilder;
 import hu.bme.mit.inf.alf.uppaal.transformation.UppaalModelSaver;
 import hu.bme.mit.inf.alf.uppaal.transformation.serialization.UppaalModelSerializer;
+import inc.util.ChoicesQuerySpecification;
+import inc.util.CompositeStatesQuerySpecification;
+import inc.util.EdgesAcrossRegionsQuerySpecification;
+import inc.util.EdgesFromEntryOfParallelRegionsQuerySpecification;
+import inc.util.EdgesInSameRegionQuerySpecification;
+import inc.util.EdgesWithEffectQuerySpecification;
+import inc.util.EdgesWithGuardQuerySpecification;
+import inc.util.EdgesWithRaisingEventQuerySpecification;
+import inc.util.EdgesWithTimeTriggerQuerySpecification;
+import inc.util.EdgesWithTriggerElementReferenceQuerySpecification;
+import inc.util.EntryOfRegionsQuerySpecification;
+import inc.util.ExitNodeSyncQuerySpecification;
+import inc.util.ExitNodesQuerySpecification;
+import inc.util.FinalStateEdgeQuerySpecification;
+import inc.util.FinalStatesQuerySpecification;
+import inc.util.SourceAndTargetOfTransitionsQuerySpecification;
+import inc.util.StatesQuerySpecification;
+import inc.util.TriggerOfTransitionQuerySpecification;
+import inc.util.VariableDefinitionsQuerySpecification;
+import inc.util.VerticesOfRegionsQuerySpecification;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -20,6 +40,8 @@ import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.emf.ecore.resource.impl.ResourceSetImpl;
+import org.eclipse.incquery.runtime.api.IncQueryEngine;
+import org.eclipse.incquery.runtime.api.impl.RunOnceQueryEngine;
 import org.eclipse.incquery.runtime.exception.IncQueryException;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
@@ -50,15 +72,16 @@ import de.uni_paderborn.uppaal.templates.Template;
  *  - különbözõ absztrakciós szinteket összekötõ élek
  */
 public class CommandHandler extends AbstractHandler {
+	
+	// IncQuery engines
+	private IncQueryEngine engine;
+	private RunOnceQueryEngine runOnceEngine;
 	 
 	// Uppaal változónevek
 	private final String syncChanVar = "syncChan";
 	private final String isActiveVar = "isActive";
 	private final String clockVar = "Timer";
 	private final String endVar = "end";
-
-	// Az IncQuery illeszkedések lekérésére
-	private PatternMatcher matcher = null;
 			
 	// Az UPPAAL modell felépítésre
 	private UppaalModelBuilder builder = null;	
@@ -72,7 +95,8 @@ public class CommandHandler extends AbstractHandler {
 	// Egy Map a Yakindu:Transition -> UPPAAL:Edge leképzésre
 	private Map<Transition, Edge> transitionEdgeMap = null;
 			
-	// Egy Map a Yakindu:Transition -> UPPAAL:Edge leképzésre
+	// Egy Map a Yakindu:Vertex -> UPPAAL:Edge leképzésre
+	// Az entryLocation-nel rendelkezõ vertex Uppaal megfelelõ locationjébe vezetõ élet adja vissza
 	private Map<Vertex, Edge> hasEntryLoc = null;
 	
 	// Egy Map, amely tárolja az egyes Vertexek triggerLocation kimenõ élét
@@ -111,9 +135,9 @@ public class CommandHandler extends AbstractHandler {
 
 								Statechart statechart = (Statechart) resource.getContents().get(0);
 
-								matcher = new PatternMatcher();
-								Helper.setMatcher(matcher);
-								matcher.setResource(resource); // IncQuery engine inicializáció a resource-ra: statechartot tartalmazó fájl
+								engine = IncQueryEngine.on(resource);
+								runOnceEngine = new RunOnceQueryEngine(resource);
+								Helper.setEngine(engine, runOnceEngine);
 								
 								try {
 									// UPPAAL modell inicializáció
@@ -155,6 +179,8 @@ public class CommandHandler extends AbstractHandler {
 									String filen = UppaalModelSaver.removeFileExtension(fileURISubstring);									
 									// Elmenti a modellt egy XML fájlba, lényegében létrehozza az UPPAAL által megnyitható fájlt
 									UppaalModelSerializer.saveToXML(filen);
+									// Létrehozza a q file-t
+									UppaalQueryGenerator.saveToQ(filen);
 									
 									// Reseteli a buildert, hogy a következõ transzformációt nulláról kezdhessük
 									builder.reset();
@@ -180,7 +206,8 @@ public class CommandHandler extends AbstractHandler {
 	 */
 	private void createVariables() throws IncQueryException {
 		// Lekérjük a változó definiciókat
-		Collection<VariableDefinitionsMatch> allVariableDefinitions = matcher.getAllVariables();
+		VariableDefinitionsMatcher variableDefinitionsMatcher = engine.getMatcher(VariableDefinitionsQuerySpecification.instance());
+		Collection<VariableDefinitionsMatch> allVariableDefinitions = variableDefinitionsMatcher.getAllMatches();
 		System.out.println("A változók száma: " + allVariableDefinitions.size());
 		for (VariableDefinitionsMatch variableMatch : allVariableDefinitions) {
 			StringBuilder expression = new StringBuilder();
@@ -210,18 +237,17 @@ public class CommandHandler extends AbstractHandler {
 	 */
 	private void createTemplates() throws Exception {
 		// Lekérjük a régiókat
-		Collection<EntryOfRegionsMatch> regionMatches = matcher.getAllRegionsWithEntry();
+		EntryOfRegionsMatcher entryOfRegionsMatcher = engine.getMatcher(EntryOfRegionsQuerySpecification.instance());
+		Collection<EntryOfRegionsMatch> regionMatches = entryOfRegionsMatcher.getAllMatches();
 		// Végigmegyünk a régiókon, és létrehozzuk a Yakindu modellnek megfeleltethetõ elemeket.
 		for (EntryOfRegionsMatch regionMatch : regionMatches) {
-			Template template = null;			
+			Template template = builder.createTemplate(Helper.getTemplateNameFromRegionName(regionMatch.getRegion()));			
 			// Kiszedjük a template nevekbõl a szóközöket, mert az UPPAAL nem szereti
 			if (Helper.isTopRegion(regionMatch.getRegion())) {
-				template = builder.createTemplate(regionMatch.getRegionName().replaceAll(" ", "") + "OfStatechart");
 				// Mégis foglalkozunk, hogy a regionökön átívelõ tranziciók helyes lefutása garantálható legyen
 				builder.addLocalDeclaration("bool " + isActiveVar + " = true;", template);
 			} 
 			else {
-				template = builder.createTemplate(regionMatch.getRegionName().replaceAll(" ", "") + "Of" + ((State) regionMatch.getRegion().getComposite()).getName());
 				// Az alsóbb szinteken kezdetben false érvényességi változót vezetünk be
 				builder.addLocalDeclaration("bool " + isActiveVar + " = false;", template);
 			}			
@@ -299,7 +325,8 @@ public class CommandHandler extends AbstractHandler {
 	 */
 	private void createLocationsFromStates(Region region, Template template) throws IncQueryException {
 		// Lekérjük az állapotokat
-		Collection<StatesMatch> allStateMatches = matcher.getAllStates();
+		StatesMatcher statesMatcher = engine.getMatcher(StatesQuerySpecification.instance());
+		Collection<StatesMatch> allStateMatches = statesMatcher.getAllMatches();
 		// Megnézzük a state matcheket és létrehozzuk a location-öket
 		for (StatesMatch stateMatch : allStateMatches) {				
 			if (stateMatch.getParentRegion() == region) {										
@@ -325,7 +352,8 @@ public class CommandHandler extends AbstractHandler {
 		// A különbözõ choice-ok megkülönböztetésére
 		int id = 0; 
 		// Lekérjük a choice-okat
-		Collection<ChoicesMatch> allChoices = matcher.getAllChoices();
+		ChoicesMatcher choicesMatcher = engine.getMatcher(ChoicesQuerySpecification.instance());
+		Collection<ChoicesMatch> allChoices = choicesMatcher.getAllMatches();
 		// Megnézzük a state matcheket és létrehozzuk a location-öket		
 		for (ChoicesMatch choiceMatch : allChoices) {
 			if (choiceMatch.getRegion() == region) {										
@@ -347,7 +375,8 @@ public class CommandHandler extends AbstractHandler {
 		// A különbözõ final state-ek megkülönböztetésére
 		int id = 0; 
 		// Lekérjük a final state-eket
-		Collection<FinalStatesMatch> allFinalStates = matcher.getAllFinalStates();
+		FinalStatesMatcher finalStatesMatcher = engine.getMatcher(FinalStatesQuerySpecification.instance());
+		Collection<FinalStatesMatch> allFinalStates = finalStatesMatcher.getAllMatches();
 		// Megnézzük a state matcheket és létrehozzuk a location-öket		
 		for (FinalStatesMatch finalStateMatch : allFinalStates) {					
 			if (finalStateMatch.getRegion() == region) {										
@@ -363,7 +392,8 @@ public class CommandHandler extends AbstractHandler {
 	 * @throws IncQueryException
 	 */
 	private void createFinalStateEdgeUpdates() throws IncQueryException {
-		for (FinalStateEdgeMatch finalStateEdgeMatch : matcher.getAllFinalStateEdges()) {
+		FinalStateEdgeMatcher finalStateEdgeMatcher = engine.getMatcher(FinalStateEdgeQuerySpecification.instance());
+		for (FinalStateEdgeMatch finalStateEdgeMatch : finalStateEdgeMatcher.getAllMatches()) {
 			builder.setEdgeUpdate(transitionEdgeMap.get(finalStateEdgeMatch.getIncomingEdge()), endVar + " = true");
 		}
 	}
@@ -375,10 +405,11 @@ public class CommandHandler extends AbstractHandler {
 	 * @throws IncQueryException
 	 */
 	private void createLocationsFromExitNodes(Region region, Template template) throws IncQueryException {
-		// A különbözõ final state-ek megkülönböztetésére
+		// A különbözõ exit node-ok megkülönböztetésére
 		int id = 0; 
-		// Lekérjük a final state-eket
-		Collection<ExitNodesMatch> allExitNodes = matcher.getAllExitNodes();
+		// Lekérjük a exit node-okat
+		ExitNodesMatcher exitNodesMatcher = engine.getMatcher(ExitNodesQuerySpecification.instance());
+		Collection<ExitNodesMatch> allExitNodes = exitNodesMatcher.getAllMatches();
 		// Megnézzük a state matcheket és létrehozzuk a location-öket		
 		for (ExitNodesMatch exitNodesMatch : allExitNodes) {						
 			if (exitNodesMatch.getRegion() == region) {
@@ -396,12 +427,14 @@ public class CommandHandler extends AbstractHandler {
 	 */
 	private void createUpdatesForExitNodes() throws IncQueryException {
 		// Lekérjük az exit node-okat
-		Collection<ExitNodeSyncMatch> allExitNodes = matcher.getAllExitNodeSyncs();
+		ExitNodeSyncMatcher exitNodeSyncMatcher = engine.getMatcher(ExitNodeSyncQuerySpecification.instance());
+		Collection<ExitNodeSyncMatch> allExitNodes = exitNodeSyncMatcher.getAllMatches();
 		for (ExitNodeSyncMatch exitNodesMatch : allExitNodes) {
 			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
 			Edge exitNodeEdge = transitionEdgeMap.get(exitNodesMatch.getExitNodeTransition());
 			builder.setEdgeSync(exitNodeEdge, syncChanVar + (syncChanId), true);
 			builder.setEdgeSync(transitionEdgeMap.get(exitNodesMatch.getDefaultTransition()), syncChanVar + (syncChanId), false);
+			//Nem kell letiltani az össezs alatta lévõ regiont, mert azt a kimenõ él automatikusan megcsinálja			
 		}
 	}
 	
@@ -412,8 +445,9 @@ public class CommandHandler extends AbstractHandler {
 	 * @throws IncQueryException
 	 */
 	private void createEdges(Region region, Template template) throws IncQueryException {
-		//Lekérjük a transition match-eket		
-		Collection<EdgesInSameRegionMatch> edgesInSameRegionMatches = matcher.getAllEdgesInSameRegion();	
+		//Lekérjük a transition match-eket	
+		EdgesInSameRegionMatcher edgesInSameRegionMatcher = engine.getMatcher(EdgesInSameRegionQuerySpecification.instance());
+		Collection<EdgesInSameRegionMatch> edgesInSameRegionMatches = edgesInSameRegionMatcher.getAllMatches();	
 		// Megnézzük a transition match-eket és létrehozzuk az edge-eket a megfelelõ guardokkal és effectekkel
 		for (EdgesInSameRegionMatch edgesInSameRegionMatch : edgesInSameRegionMatches) {											
 			// Ha a két végpont a helyes region-ben van
@@ -436,13 +470,15 @@ public class CommandHandler extends AbstractHandler {
 	 */
 	private void createEntryForCompositeStates() throws IncQueryException {
 		// Lekérjük az állapotokat
-		Collection<CompositeStatesMatch> allCompositeStatesMatches = matcher.getAllCompositeStates();
+		CompositeStatesMatcher compositeStatesMatcher = engine.getMatcher(CompositeStatesQuerySpecification.instance());
+		SourceAndTargetOfTransitionsMatcher sourceAndTargetOfTransitionsMatcher = engine.getMatcher(SourceAndTargetOfTransitionsQuerySpecification.instance());
+		Collection<CompositeStatesMatch> allCompositeStatesMatches = compositeStatesMatcher.getAllMatches();
 		// Megnézzük a state matcheket és létrehozzuk az entry locationöket
 		for (CompositeStatesMatch compositeStateMatch : allCompositeStatesMatches) {				
 			// Létrehozzuk a locationt, majd a megfelelõ éleket a megfelelõ location-ökbe kötjük
 			Location stateEntryLocation = createEntryLocation(compositeStateMatch.getCompositeState(), compositeStateMatch.getParentRegion());
 			// Átállítjuk a bejövõ élek targetjét, ehhez felhasználjuk az összes élet lekérdezõ metódust
-			for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : matcher.getAllTransitions()) {
+			for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : sourceAndTargetOfTransitionsMatcher.getAllMatches()) {
 				if (sourceAndTargetOfTransitionsMatch.getTarget() == compositeStateMatch.getCompositeState()) {
 					if (transitionEdgeMap.containsKey(sourceAndTargetOfTransitionsMatch.getTransition())) {
 						transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()).setTarget(stateEntryLocation);
@@ -477,7 +513,8 @@ public class CommandHandler extends AbstractHandler {
 	 */
 	private void createEntryEdgesForAbstractionLevels() throws IncQueryException {
 		// Lekérjük a composite állapotokat
-		Collection<CompositeStatesMatch> allCompositeStatesMatches = matcher.getAllCompositeStates();
+		CompositeStatesMatcher compositeStatesMatcher = engine.getMatcher(CompositeStatesQuerySpecification.instance());
+		Collection<CompositeStatesMatch> allCompositeStatesMatches = compositeStatesMatcher.getAllMatches();
 		// Megnézzük a state matcheket és létrehozzuk az entry locationöket
 		for (CompositeStatesMatch compositeStateMatch : allCompositeStatesMatches) {
 			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
@@ -496,12 +533,14 @@ public class CommandHandler extends AbstractHandler {
 	private void createExitEdgesForAbstractionLevels() throws Exception {
 		int id = 0;
 		// Lekérjük a composite állapotokat
-		Collection<CompositeStatesMatch> allCompositeStateMatches = matcher.getAllCompositeStates();
+		CompositeStatesMatcher compositeStatesMatcher = engine.getMatcher(CompositeStatesQuerySpecification.instance());
+		SourceAndTargetOfTransitionsMatcher sourceAndTargetOfTransitionsMatcher = engine.getMatcher(SourceAndTargetOfTransitionsQuerySpecification.instance());
+		Collection<CompositeStatesMatch> allCompositeStatesMatches = compositeStatesMatcher.getAllMatches();
 		// Megnézzük az összes compositeState matchet
-		for (CompositeStatesMatch compositeStateMatch : allCompositeStateMatches) {
+		for (CompositeStatesMatch compositeStateMatch : allCompositeStatesMatches) {
 			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
 			// Minden kimenõ élre ráírjuk a kilépési sync-et
-			for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : matcher.getAllTransitions()) {
+			for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : sourceAndTargetOfTransitionsMatcher.getAllMatches()) {
 				if (sourceAndTargetOfTransitionsMatch.getSource() == compositeStateMatch.getCompositeState()) {
 					if (transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()).getSynchronization() == null) {
 						builder.setEdgeSync(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), syncChanVar + (syncChanId), true);
@@ -529,6 +568,7 @@ public class CommandHandler extends AbstractHandler {
 	 * @throws IncQueryException 
 	 */
 	private void setAllRegionsWithSync(boolean toBeTrue, boolean needInit, List<Region> regionList) throws IncQueryException {
+		VerticesOfRegionsMatcher verticesOfRegionsMatcher = engine.getMatcher(VerticesOfRegionsQuerySpecification.instance());
 		for (Region subregion : regionList) {
 			if (needInit) {
 				Location initLocation = builder.createLocation("Init", regionTemplateMap.get(subregion));
@@ -540,7 +580,7 @@ public class CommandHandler extends AbstractHandler {
 				builder.setInitialLocation(initLocation, regionTemplateMap.get(subregion));
 				hasInitLoc.put(regionTemplateMap.get(subregion), initLocation);
 			}			
-			for (VerticesOfRegionsMatch verticesOfRegionMatch : matcher.getAllVerticesOfRegions()) {
+			for (VerticesOfRegionsMatch verticesOfRegionMatch : verticesOfRegionsMatcher.getAllMatches()) {
 				// Az adott subregion vertexeit vizsgáljuk
 				if (verticesOfRegionMatch.getRegion() == subregion) {
 					// Choice-okból nem csinálunk magukba éleket, azokban elvileg nem tartózkodhatunk
@@ -579,7 +619,8 @@ public class CommandHandler extends AbstractHandler {
 	 */
 	private void createEdgesForDifferentAbstraction() throws IncQueryException {
 		//Lekérjük a transition match-eket		
-		Collection<EdgesAcrossRegionsMatch> allAcrossTransitionMatches = matcher.getAllEdgesAcrossRegions();	
+		EdgesAcrossRegionsMatcher edgesAcrossRegionsMatcher = engine.getMatcher(EdgesAcrossRegionsQuerySpecification.instance());
+		Collection<EdgesAcrossRegionsMatch> allAcrossTransitionMatches = edgesAcrossRegionsMatcher.getAllMatches();	
 		// Megnézzük a transition match-eket és létrehozzuk az edge-eket a megfelelõ guardokkal és effectekkel
 		for (EdgesAcrossRegionsMatch acrossTransitionMatch : allAcrossTransitionMatches) {											
 			// Ha a két végpont nem azonos region-ben van:
@@ -624,7 +665,7 @@ public class CommandHandler extends AbstractHandler {
 			builder.setEdgeComment(abstractionEdge, "A Yakinduban alacsonyabb absztrakcios szinten levo vertexbe vezeto el.");
 			// Ha a targetnek van entryEventje, akkor azt rá kell írni az élre
 			if (Helper.hasEntryEvent(target)) {
-				for (StatesWithEntryEventMatch statesWithEntryEventMatch : matcher.getAllStatesWithEntryEvent()) {
+				for (StatesWithEntryEventMatch statesWithEntryEventMatch : runOnceEngine.getAllMatches(StatesWithEntryEventMatcher.querySpecification())) {
 					if (statesWithEntryEventMatch.getState() == target) {
 						String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
 						builder.setEdgeUpdate(abstractionEdge, effect);
@@ -642,7 +683,8 @@ public class CommandHandler extends AbstractHandler {
 		}	
 		// Ha nem a legfölsõ szinten vagyunk, akkor létrehozzuk a ? szinkronizációs éleket minden állapotból a megfelelõ állapotba
 		else {
-			for (VerticesOfRegionsMatch verticesOfRegionsMatch : matcher.getAllVerticesOfRegions()) {
+			VerticesOfRegionsMatcher verticesOfRegionsMatcher = engine.getMatcher(VerticesOfRegionsQuerySpecification.instance());
+			for (VerticesOfRegionsMatch verticesOfRegionsMatch : verticesOfRegionsMatcher.getAllMatches()) {
 				if (verticesOfRegionsMatch.getRegion() == target.getParentRegion()) {
 					Edge syncEdge = builder.createEdge(regionTemplateMap.get(verticesOfRegionsMatch.getRegion()));					
 					builder.setEdgeSource(syncEdge, stateLocationMap.get(verticesOfRegionsMatch.getVertex()));
@@ -656,7 +698,7 @@ public class CommandHandler extends AbstractHandler {
 					}					
 					// Ha a targetnek van entryEventje, akkor azt rá kell írni az élre
 					if (Helper.hasEntryEvent(target)) {
-						for (StatesWithEntryEventMatch statesWithEntryEventMatch : matcher.getAllStatesWithEntryEvent()) {
+						for (StatesWithEntryEventMatch statesWithEntryEventMatch : runOnceEngine.getAllMatches(StatesWithEntryEventMatcher.querySpecification())) {
 							if (statesWithEntryEventMatch.getState() == target) {
 								String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
 								builder.setEdgeUpdate(syncEdge, effect);
@@ -727,7 +769,7 @@ public class CommandHandler extends AbstractHandler {
 			builder.setEdgeSync(ownSyncEdge, syncChanVar + (syncChanId), false);
 			// Exit eventet rárakjuk, ha van
 			if (Helper.hasExitEvent(source)) {
-				for (StatesWithExitEventWithoutOutgoingTransitionMatch statesWithExitEventMatch : matcher.getAllStatesWithExitEventWithoutOutgoing()) {
+				for (StatesWithExitEventWithoutOutgoingTransitionMatch statesWithExitEventMatch : runOnceEngine.getAllMatches(StatesWithExitEventWithoutOutgoingTransitionMatcher.querySpecification())) {
 					if (statesWithExitEventMatch.getState() == source) {
 						String effect = UppaalCodeGenerator.transformExpression(statesWithExitEventMatch.getExpression());
 						builder.setEdgeUpdate(ownSyncEdge, effect);						
@@ -752,7 +794,7 @@ public class CommandHandler extends AbstractHandler {
 			builder.setEdgeSync(ownSyncEdge, syncChanVar + (syncChanId), false);
 			builder.setEdgeUpdate(ownSyncEdge, isActiveVar + " = false");
 			if (Helper.hasExitEvent(source)) {
-				for (StatesWithExitEventWithoutOutgoingTransitionMatch statesWithExitEventMatch : matcher.getAllStatesWithExitEventWithoutOutgoing()) {
+				for (StatesWithExitEventWithoutOutgoingTransitionMatch statesWithExitEventMatch : runOnceEngine.getAllMatches(StatesWithExitEventWithoutOutgoingTransitionMatcher.querySpecification())) {
 					if (statesWithExitEventMatch.getState() == source) {
 						String effect = UppaalCodeGenerator.transformExpression(statesWithExitEventMatch.getExpression());
 						builder.setEdgeUpdate(ownSyncEdge, effect);						
@@ -769,7 +811,8 @@ public class CommandHandler extends AbstractHandler {
 	 */
 	private void setEdgeUpdates() throws Exception {
 		// Végigmegyünk minden transition-ön, amelynek van effectje
-		for (EdgesWithEffectMatch edgesWithEffectMatch : matcher.getAllEdgesWithEffect()) {
+		EdgesWithEffectMatcher edgesWithEffectMatcher = engine.getMatcher(EdgesWithEffectQuerySpecification.instance());
+		for (EdgesWithEffectMatch edgesWithEffectMatch : edgesWithEffectMatcher.getAllMatches()) {
 			String effect = UppaalCodeGenerator.transformExpression(edgesWithEffectMatch.getExpression());
 			builder.setEdgeUpdate(transitionEdgeMap.get(edgesWithEffectMatch.getTransition()), effect);
 		}
@@ -788,7 +831,8 @@ public class CommandHandler extends AbstractHandler {
 	 * @throws IncQueryException 
 	 */
 	private void setEdgeUpdatesFromStates() throws IncQueryException {
-		for (StatesWithEntryEventMatch statesWithEntryEventMatch : matcher.getAllStatesWithEntryEvent()) {
+		EdgesInSameRegionMatcher edgesInSameRegionMatcher = engine.getMatcher(EdgesInSameRegionQuerySpecification.instance());
+		for (StatesWithEntryEventMatch statesWithEntryEventMatch : runOnceEngine.getAllMatches(StatesWithEntryEventMatcher.querySpecification())) {
 			// Transzformáljuk a kifejezést
 			String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
 			// Ha nincs még entry state-je
@@ -797,7 +841,7 @@ public class CommandHandler extends AbstractHandler {
 				Location stateEntryLocation = createEntryLocation(statesWithEntryEventMatch.getState(), statesWithEntryEventMatch.getParentRegion());
 				builder.setEdgeUpdate(hasEntryLoc.get(statesWithEntryEventMatch.getState()), effect);
 				// Átállítjuk a bejövõ élek targetjét
-				for (EdgesInSameRegionMatch edgesInSameRegionMatch : matcher.getAllEdgesInSameRegion()) {
+				for (EdgesInSameRegionMatch edgesInSameRegionMatch : edgesInSameRegionMatcher.getAllMatches()) {
 					if (edgesInSameRegionMatch.getTarget() == statesWithEntryEventMatch.getState()) {
 						transitionEdgeMap.get(edgesInSameRegionMatch.getTransition()).setTarget(stateEntryLocation);
 					}
@@ -810,7 +854,7 @@ public class CommandHandler extends AbstractHandler {
 		}
 		// Ha Exit, akkor ráírjuk az update-et minden kimenõ élre
 		// Nem használhatunk committed locationt
-		for (StatesWithExitEventMatch statesWithExitEventMatch : matcher.getAllStatesWithExitEvent()) {
+		for (StatesWithExitEventMatch statesWithExitEventMatch : runOnceEngine.getAllMatches(StatesWithExitEventMatcher.querySpecification())) {
 			String effect = UppaalCodeGenerator.transformExpression(statesWithExitEventMatch.getExpression());			
 			builder.setEdgeUpdate(transitionEdgeMap.get(statesWithExitEventMatch.getTransition()), effect);			
 		}
@@ -822,7 +866,8 @@ public class CommandHandler extends AbstractHandler {
 	 */
 	private void setEdgeGuards() throws IncQueryException {
 		// Végigmegyünk minden transition-ön
-		for (EdgesWithGuardMatch edgesWithGuardMatch : matcher.getAllEdgesWithGuard()) {
+		EdgesWithGuardMatcher edgesWithGuardMatcher = engine.getMatcher(EdgesWithGuardQuerySpecification.instance());
+		for (EdgesWithGuardMatch edgesWithGuardMatch : edgesWithGuardMatcher.getAllMatches()) {
 			// Ha van guard-ja, akkor azt transzformáljuk, és ráírjuk az edge-re
 			String guard = UppaalCodeGenerator.transformExpression(edgesWithGuardMatch.getExpression());
 			if (builder.getEdgeGuard(transitionEdgeMap.get(edgesWithGuardMatch.getTransition())) != null && builder.getEdgeGuard(transitionEdgeMap.get(edgesWithGuardMatch.getTransition())) != "") {
@@ -835,12 +880,13 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
-	 * Létrehozza a template-ek érvényes mûködéséhez szükséges guardokat. (isValid)
+	 * Létrehozza a template-ek érvényes mûködéséhez szükséges guardokat. (isActive)
 	 * @param transition A Yakindu transition, amelynek a megfeleltetett UPPAAL élére rakjuk rá az érvényességi guardot.
 	 * @throws IncQueryException 
 	 */
 	private void createTemplateValidityGuards() throws IncQueryException {
-		for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : matcher.getAllTransitions()) {
+		SourceAndTargetOfTransitionsMatcher sourceAndTargetOfTransitionsMatcher = engine.getMatcher(SourceAndTargetOfTransitionsQuerySpecification.instance());
+		for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : sourceAndTargetOfTransitionsMatcher.getAllMatches()) {
 			// Rátesszük a guardokra a template érvényességi vátozót is
 			if (builder.getEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())) != null && builder.getEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())) != "") {
 				builder.setEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), ((Helper.hasFinalState()) ? ("!" + endVar + " && ") : "") + isActiveVar + " && " + builder.getEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())));
@@ -853,16 +899,18 @@ public class CommandHandler extends AbstractHandler {
 	
 	/**
 	 * Ez a metódus felel az event raising megvalósításáért.
-	 * @throws Exception Jelzi, ha nem mûködik a szinkronizáció. (Nem tökéletes még ez a kód.)
+	 * @throws Exception jelzi, ha nem mûködik a szinkronizáció. (Nem tökéletes még ez a kód.)
 	 */
 	private void createRaisingEventSyncs() throws Exception {
-		for (EdgesWithRaisingEventMatch edgesWithRaisingEventMatch : matcher.getAllEdgesWithRaisingEvent()) {
+		EdgesWithRaisingEventMatcher edgesWithRaisingEventMatcher = engine.getMatcher(EdgesWithRaisingEventQuerySpecification.instance());
+		EdgesWithTriggerElementReferenceMatcher edgesWithTriggerElementReferenceMatcher = engine.getMatcher(EdgesWithTriggerElementReferenceQuerySpecification.instance());
+		for (EdgesWithRaisingEventMatch edgesWithRaisingEventMatch : edgesWithRaisingEventMatcher.getAllMatches()) {
 			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
 			if (transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()).getSynchronization() != null) {
 				throw new Exception("Baj van a raising cuccal, mert már van syncje.");
 			}
 			builder.setEdgeSync(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()), syncChanVar + (syncChanId), true);
-			for (EdgesWithTriggerElementReferenceMatch edgesWithTriggerElementReferenceMatch : matcher.getAllEdgesWithTriggerElementReference()) {
+			for (EdgesWithTriggerElementReferenceMatch edgesWithTriggerElementReferenceMatch : edgesWithTriggerElementReferenceMatcher.getAllMatches()) {
 				if (edgesWithTriggerElementReferenceMatch.getElement() == edgesWithRaisingEventMatch.getElement()) {
 					if (transitionEdgeMap.get(edgesWithTriggerElementReferenceMatch.getTransition()).getSynchronization() != null) {
 						throw new Exception("Baj van a raising cuccal, mert már van syncje.");
@@ -882,7 +930,8 @@ public class CommandHandler extends AbstractHandler {
 	 */
 	private void createSyncFromEntries() throws IncQueryException {
 		Map<State, String> hasSync = new HashMap<State, String>();
-		for (EdgesFromEntryOfParallelRegionsMatch edgesFromEntryOfParallelRegionsMatch : matcher.getEdgesFromEntryOfParallelRegions()) {
+		EdgesFromEntryOfParallelRegionsMatcher edgesFromEntryOfParallelRegionsMatcher = engine.getMatcher(EdgesFromEntryOfParallelRegionsQuerySpecification.instance());
+		for (EdgesFromEntryOfParallelRegionsMatch edgesFromEntryOfParallelRegionsMatch : edgesFromEntryOfParallelRegionsMatcher.getAllMatches()) {
 			if (hasSync.containsKey(edgesFromEntryOfParallelRegionsMatch.getCompositeState())) {
 				builder.setEdgeSync(transitionEdgeMap.get(edgesFromEntryOfParallelRegionsMatch.getTransition()),
 						hasSync.get(edgesFromEntryOfParallelRegionsMatch.getCompositeState()), false);
@@ -901,7 +950,8 @@ public class CommandHandler extends AbstractHandler {
 	 * @throws IncQueryException 
 	 */
 	private void createTimingEvents() throws IncQueryException {
-		for (EdgesWithTimeTriggerMatch edgesWithTimeTriggerMatch : matcher.getEdgesWithTimeTrigger()) {
+		EdgesWithTimeTriggerMatcher edgesWithTimeTriggerMatcher = engine.getMatcher(EdgesWithTimeTriggerQuerySpecification.instance());
+		for (EdgesWithTimeTriggerMatch edgesWithTimeTriggerMatch : edgesWithTimeTriggerMatcher.getAllMatches()) {
 			builder.setEdgeUpdate(transitionEdgeMap.get(edgesWithTimeTriggerMatch.getIncomingTransition()), clockVar + " = 0");
 			builder.setLocationInvariant(stateLocationMap.get(edgesWithTimeTriggerMatch.getSource()), clockVar + " <= " + UppaalCodeGenerator.transformExpression(edgesWithTimeTriggerMatch.getValue()));
 			builder.setEdgeGuard(transitionEdgeMap.get(edgesWithTimeTriggerMatch.getTriggerTransition()), clockVar + " >= " + UppaalCodeGenerator.transformExpression(edgesWithTimeTriggerMatch.getValue()));
@@ -918,7 +968,8 @@ public class CommandHandler extends AbstractHandler {
 		builder.setInitialLocation(controlLocation, controlTemplate);
 		Set<String> triggerNames = new HashSet<String>();
 		int id = 0;
-		for (TriggerOfTransitionMatch triggerOfTransitionMatch : matcher.getAllTriggersOfTransitions()) {			
+		TriggerOfTransitionMatcher transitionMatcher = engine.getMatcher(TriggerOfTransitionQuerySpecification.instance());
+		for (TriggerOfTransitionMatch triggerOfTransitionMatch : transitionMatcher.getAllMatches()) {			
 			if (!triggerNames.contains(triggerOfTransitionMatch.getTriggerName())) {
 				Edge ownTriggerEdge = builder.createEdge(controlTemplate);
 				builder.setEdgeSource(ownTriggerEdge, controlLocation);
