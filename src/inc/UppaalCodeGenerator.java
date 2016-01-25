@@ -99,7 +99,7 @@ public class UppaalCodeGenerator {
 		}
 		// Értékadás esetén: Megnézem a bal oldalt, kiteszek egy = jelet, majd megnézem a jobb oldalt.
 		else if (expression instanceof AssignmentExpression) {
-			return transformExpression(((AssignmentExpression) expression).getVarRef()) + " = " + transformExpression(((AssignmentExpression) expression).getExpression());
+			return transformExpression(((AssignmentExpression) expression).getVarRef()) + "  " + ((AssignmentExpression) expression).getOperator().getLiteral() + " " + transformExpression(((AssignmentExpression) expression).getExpression());
 		}
 		// Ha a kifejezés egy FeatureCall (pl.: Server.value), akkor megnézem a változó nevét
 		// Interfész referenciával nem foglalkozunk
