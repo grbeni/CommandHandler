@@ -18,6 +18,8 @@ import inc.util.ExitNodeSyncQuerySpecification;
 import inc.util.ExitNodesQuerySpecification;
 import inc.util.FinalStateEdgeQuerySpecification;
 import inc.util.FinalStatesQuerySpecification;
+import inc.util.InEventsQuerySpecification;
+import inc.util.InValuesQuerySpecification;
 import inc.util.SourceAndTargetOfTransitionsQuerySpecification;
 import inc.util.StatesQuerySpecification;
 import inc.util.TriggerOfTransitionQuerySpecification;
@@ -966,18 +968,36 @@ public class CommandHandler extends AbstractHandler {
 		Template controlTemplate = builder.createTemplate("controlTemplate");
 		Location controlLocation = builder.createLocation("triggerLocation", controlTemplate);
 		builder.setInitialLocation(controlLocation, controlTemplate);
-		Set<String> triggerNames = new HashSet<String>();
-		int id = 0;
-		TriggerOfTransitionMatcher transitionMatcher = engine.getMatcher(TriggerOfTransitionQuerySpecification.instance());
-		for (TriggerOfTransitionMatch triggerOfTransitionMatch : transitionMatcher.getAllMatches()) {			
-			if (!triggerNames.contains(triggerOfTransitionMatch.getTriggerName())) {
+		
+		InEventsMatcher inEventsMatcher = engine.getMatcher(InEventsQuerySpecification.instance());
+		InValuesMatcher inValuesMatcher = engine.getMatcher(InValuesQuerySpecification.instance());
+		
+		for (InEventsMatch inEventsMatch : inEventsMatcher.getAllMatches()) {
+			if (inEventsMatch.getInEvent().getType() == null) {
 				Edge ownTriggerEdge = builder.createEdge(controlTemplate);
 				builder.setEdgeSource(ownTriggerEdge, controlLocation);
 				builder.setEdgeTarget(ownTriggerEdge, controlLocation);
-				builder.addGlobalDeclaration("broadcast chan " + triggerOfTransitionMatch.getTriggerName() + ";");
-				triggerNames.add(triggerOfTransitionMatch.getTriggerName());
-				builder.setEdgeSync(ownTriggerEdge, triggerOfTransitionMatch.getTriggerName(), true);
+				builder.addGlobalDeclaration("broadcast chan " + inEventsMatch.getName() + ";");
+				builder.setEdgeSync(ownTriggerEdge, inEventsMatch.getName(), true);
 			}
+			else if (inEventsMatch.getInEvent().getType().getName() == "integer") {
+				builder.addGlobalDeclaration("int " + inEventsMatch.getName() + ";");
+				for (InValuesMatch inValuesMatch : inValuesMatcher.getAllMatches()) {
+					Edge ownTriggerEdge = builder.createEdge(controlTemplate);
+					builder.setEdgeSource(ownTriggerEdge, controlLocation);
+					builder.setEdgeTarget(ownTriggerEdge, controlLocation);
+					builder.setEdgeUpdate(ownTriggerEdge, inEventsMatch.getName() + " = " + UppaalCodeGenerator.transformExpression(inValuesMatch.getInitialValue()));
+				}
+			}
+		}
+		
+		createSimpleTriggers(controlTemplate, controlLocation);
+	}
+	
+	private void createSimpleTriggers(Template controlTemplate, Location controlLocation) throws Exception {
+		TriggerOfTransitionMatcher transitionMatcher = engine.getMatcher(TriggerOfTransitionQuerySpecification.instance());
+		int id = 0;
+		for (TriggerOfTransitionMatch triggerOfTransitionMatch : transitionMatcher.getAllMatches()) {					
 			if (transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization() != null) {
 				Edge syncEdge = createSyncLocation(builder.getEdgeTarget(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition())), "triggerLocation" + (++id), transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization(), regionTemplateMap.get(triggerOfTransitionMatch.getParentRegion()));
 				builder.setEdgeTarget(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), builder.getEdgeSource(syncEdge));
@@ -988,7 +1008,7 @@ public class CommandHandler extends AbstractHandler {
 				builder.setEdgeSync(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), triggerOfTransitionMatch.getTriggerName(), false);
 			}
 		}
-	}
+	}	
 	
 	/**
 	 * Ez a metódus létrehoz egy szinkronizációs élet egy új location-bõl és azt beleköti a targetbe, ráírva a megadott szinkornizációt.
@@ -1010,6 +1030,6 @@ public class CommandHandler extends AbstractHandler {
 		builder.setEdgeTarget(syncEdge, target);
 		builder.setEdgeSync(syncEdge, sync);
 		return syncEdge;
-	}
+	}	
 	
 }

@@ -19,7 +19,9 @@ import org.yakindu.base.expressions.expressions.NumericalUnaryExpression;
 import org.yakindu.base.expressions.expressions.ParenthesizedExpression;
 import org.yakindu.base.expressions.expressions.PrimitiveValueExpression;
 import org.yakindu.base.expressions.expressions.ShiftExpression;
+import org.yakindu.sct.model.stext.stext.EventDefinition;
 import org.yakindu.sct.model.stext.stext.EventRaisingExpression;
+import org.yakindu.sct.model.stext.stext.EventValueReferenceExpression;
 import org.yakindu.sct.model.stext.stext.VariableDefinition;
 
 public class UppaalCodeGenerator {
@@ -109,6 +111,10 @@ public class UppaalCodeGenerator {
 				VariableDefinition variable = (VariableDefinition) featureCall.getFeature();
 				return variable.getName();
 			}
+			if (featureCall.getFeature() instanceof EventDefinition) {
+				EventDefinition variable = (EventDefinition) featureCall.getFeature();
+				return variable.getName();
+			}
 			return "Az FeatureCall feature-e nem VariableDefinition. :(";
 		}
 		// Ha a kifejezés egy elemhivatkozás, megnézem az elemet, és ha változó, visszaadom a nevét
@@ -123,7 +129,7 @@ public class UppaalCodeGenerator {
 		// Ha a kifejezés egy logikai reláció: Transzformálom a baloldalt, kiírom a relációs jelet, majd transzformálom a jobboldalt
 		else if (expression instanceof LogicalRelationExpression) {
 			LogicalRelationExpression logicalRelation = (LogicalRelationExpression) expression;
-			return transformExpression(logicalRelation.getLeftOperand()) + " " + logicalRelation.getOperator().getLiteral() + transformExpression(logicalRelation.getRightOperand());
+			return transformExpression(logicalRelation.getLeftOperand()) + " " + logicalRelation.getOperator().getLiteral() + " " + transformExpression(logicalRelation.getRightOperand());
 		}
 		// Ha a kifejezés egy logikai OR: Transzformálom a baloldalt, kiírom a relációs jelet, majd transzformálom a jobboldalt
 		else if (expression instanceof LogicalOrExpression) {
@@ -149,6 +155,9 @@ public class UppaalCodeGenerator {
 			// Ekkor nem a transitionre írunk rá, hanem sync csatornát hozunk létre
 			// lsd.: createRaisingEventSyncs() metódus
 			return "";
+		}
+		else if (expression instanceof EventValueReferenceExpression) {
+			return transformExpression(((EventValueReferenceExpression) expression).getValue());
 		}
 		// Különben nem ismert kifejezés kivételt dobok
 		else {

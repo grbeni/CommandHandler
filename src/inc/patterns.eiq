@@ -206,14 +206,29 @@ pattern edgesWithTimeTrigger(incomingTransition : Transition, triggerTransition 
 	TimeEventSpec.value(trigger, value);
 }
 
+// Leszedi az in eventket
+pattern inEvents(inEvent : EventDefinition, name) {
+	EventDefinition.direction(inEvent, ::IN);
+	EventDefinition.name(inEvent, name);
+}
+
 // Triggerrel rendelkezõ transitionöket szedi le
-pattern triggerOfTransition(transition : Transition, parentRegion : Region, triggerName) {
+pattern triggerOfTransition(transition : Transition, parentRegion : Region, feature : EventDefinition, triggerName) {
 	Transition.source.parentRegion(transition, parentRegion);
 	Transition.trigger(transition, trigger);
 	ReactionTrigger.triggers(trigger, aTrigger);
 	RegularEventSpec.event(aTrigger, event);
 	FeatureCall.feature(event, feature);
 	EventDefinition.name(feature, triggerName);
+}
+
+// Leszedi a beadható értékeket
+pattern inValues(interface : InterfaceScope, variable : VariableDefinition, name, initialValue : Expression) {
+	InterfaceScope.name(interface, "IntegerValues");
+	InterfaceScope.declarations(interface, variable);
+	VariableDefinition.readonly(variable, true);
+	VariableDefinition.name(variable, name);
+	VariableDefinition.initialValue(variable, initialValue);
 }
 
 pattern transitionWithTrigger(transition : Transition) {
