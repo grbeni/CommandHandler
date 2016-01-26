@@ -989,23 +989,28 @@ public class CommandHandler extends AbstractHandler {
 					builder.setEdgeUpdate(ownTriggerEdge, inEventsMatch.getName() + " = " + UppaalCodeGenerator.transformExpression(inValuesMatch.getInitialValue()));
 				}
 			}
-		}
-		
+		}		
 		createSimpleTriggers(controlTemplate, controlLocation);
 	}
 	
 	private void createSimpleTriggers(Template controlTemplate, Location controlLocation) throws Exception {
 		TriggerOfTransitionMatcher transitionMatcher = engine.getMatcher(TriggerOfTransitionQuerySpecification.instance());
+		Set<Transition> triggeredTransitions = new HashSet<Transition>();
 		int id = 0;
-		for (TriggerOfTransitionMatch triggerOfTransitionMatch : transitionMatcher.getAllMatches()) {					
+		for (TriggerOfTransitionMatch triggerOfTransitionMatch : transitionMatcher.getAllMatches()) {			
+			if (triggeredTransitions.contains(triggerOfTransitionMatch.getTransition())) {
+				builder.cloneEdge(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()));
+			}
 			if (transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization() != null) {
 				Edge syncEdge = createSyncLocation(builder.getEdgeTarget(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition())), "triggerLocation" + (++id), transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization(), regionTemplateMap.get(triggerOfTransitionMatch.getParentRegion()));
 				builder.setEdgeTarget(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), builder.getEdgeSource(syncEdge));
 				builder.setEdgeSync(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), triggerOfTransitionMatch.getTriggerName(), false);
+				triggeredTransitions.add(triggerOfTransitionMatch.getTransition());
 				hasTriggerPlusEdge.put(triggerOfTransitionMatch.getTransition(), syncEdge);
 			}
 			else {
 				builder.setEdgeSync(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), triggerOfTransitionMatch.getTriggerName(), false);
+				triggeredTransitions.add(triggerOfTransitionMatch.getTransition());
 			}
 		}
 	}	
