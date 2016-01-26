@@ -961,7 +961,7 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
-	 * Ez a metódus létrehozza a triggereket, és a hozzá szükséges új locationöket és edge-eket a megfelelõ template-ekben. 
+	 * This method is responsible for creating the control template, the synchronization values and gather all the integer values that can be added as an in value. 
 	 * @throws Exception 
 	 */
 	private void createControlTemplate() throws Exception {
@@ -990,17 +990,26 @@ public class CommandHandler extends AbstractHandler {
 				}
 			}
 		}		
-		createSimpleTriggers(controlTemplate, controlLocation);
+		createTriggers(controlTemplate, controlLocation);
 	}
 	
-	private void createSimpleTriggers(Template controlTemplate, Location controlLocation) throws Exception {
+	/**
+	 * This method is responsible for placing the triggers on the mapped edges as synchronizations 
+	 * and duplicate edges if the trigger in the Yakindu model is composite.	 * 
+	 * @param controlTemplate The control template, we want to handle the triggers from.
+	 * @param controlLocation The only location in the control template.
+	 * @throws Exception
+	 */
+	private void createTriggers(Template controlTemplate, Location controlLocation) throws Exception {
 		TriggerOfTransitionMatcher transitionMatcher = engine.getMatcher(TriggerOfTransitionQuerySpecification.instance());
 		Set<Transition> triggeredTransitions = new HashSet<Transition>();
 		int id = 0;
-		for (TriggerOfTransitionMatch triggerOfTransitionMatch : transitionMatcher.getAllMatches()) {			
+		for (TriggerOfTransitionMatch triggerOfTransitionMatch : transitionMatcher.getAllMatches()) {	
+			// If the mappeed edge already has a trigger, then we clone it, so the next part may not overwrite it
 			if (triggeredTransitions.contains(triggerOfTransitionMatch.getTransition())) {
 				builder.cloneEdge(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()));
 			}
+			// If the mapped edge already has a sync, we have to create a syncing location
 			if (transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization() != null) {
 				Edge syncEdge = createSyncLocation(builder.getEdgeTarget(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition())), "triggerLocation" + (++id), transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization(), regionTemplateMap.get(triggerOfTransitionMatch.getParentRegion()));
 				builder.setEdgeTarget(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), builder.getEdgeSource(syncEdge));
