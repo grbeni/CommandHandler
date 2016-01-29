@@ -907,18 +907,22 @@ public class CommandHandler extends AbstractHandler {
 		EdgesWithRaisingEventMatcher edgesWithRaisingEventMatcher = engine.getMatcher(EdgesWithRaisingEventQuerySpecification.instance());
 		EdgesWithTriggerElementReferenceMatcher edgesWithTriggerElementReferenceMatcher = engine.getMatcher(EdgesWithTriggerElementReferenceQuerySpecification.instance());
 		for (EdgesWithRaisingEventMatch edgesWithRaisingEventMatch : edgesWithRaisingEventMatcher.getAllMatches()) {
-			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
-			if (transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()).getSynchronization() != null) {
-				throw new Exception("Baj van a raising cuccal, mert már van syncje.");
+			builder.addGlobalDeclaration("broadcast chan " + edgesWithRaisingEventMatch.getName() + ";");
+			/*if (transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()).getSynchronization() != null) {
+				//throw new Exception("Baj van a raising cuccal, mert már van syncje.");
 			}
-			builder.setEdgeSync(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()), syncChanVar + (syncChanId), true);
+			else {
+				builder.setEdgeSync(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()), edgesWithRaisingEventMatch.getName(), true);
+			}*/
+			Edge raiseEdge = createSyncLocationWithString(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()).getTarget(), "Raise_" + edgesWithRaisingEventMatch.getName(), edgesWithRaisingEventMatch.getName());
+			builder.setEdgeTarget(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()), raiseEdge.getSource());
 			for (EdgesWithTriggerElementReferenceMatch edgesWithTriggerElementReferenceMatch : edgesWithTriggerElementReferenceMatcher.getAllMatches()) {
 				if (edgesWithTriggerElementReferenceMatch.getElement() == edgesWithRaisingEventMatch.getElement()) {
 					if (transitionEdgeMap.get(edgesWithTriggerElementReferenceMatch.getTransition()).getSynchronization() != null) {
 						throw new Exception("Baj van a raising cuccal, mert már van syncje.");
 					}
 					else {
-						builder.setEdgeSync(transitionEdgeMap.get(edgesWithTriggerElementReferenceMatch.getTransition()), syncChanVar + (syncChanId), false);
+						builder.setEdgeSync(transitionEdgeMap.get(edgesWithTriggerElementReferenceMatch.getTransition()), edgesWithRaisingEventMatch.getName(), false);
 					}
 				}
 			}
@@ -1045,5 +1049,25 @@ public class CommandHandler extends AbstractHandler {
 		builder.setEdgeSync(syncEdge, sync);
 		return syncEdge;
 	}	
+	
+	/**
+	 * Ez a metódus létrehoz egy szinkronizációs élet egy új location-bõl és azt beleköti a targetbe, ráírva a megadott szinkornizációt.
+	 * @param target A location, ahova kötni szeretnénk az élet.
+	 * @param locationName A név, amelyet adni szeretnénk a létrehozott locationnek.
+	 * @param sync A szinkronizáció, amelyet rá szeretnénk tenni az élre.
+	 * @param template A template, amelybe bele szeretnénk rakni a létrehozott locationt.
+	 * @return A szinkronizáció edge, amely a létrehozott locationbõl belevezet a target locationbe.
+	 * @throws Exception Ezt akkor dobja, ha az átadott szinkornizáció ? szinkornizáció. Ekkor a létrehozott struktúra nem mûködhet jól.
+	 */
+	private Edge createSyncLocationWithString(Location target, String locationName, String sync) throws Exception {
+		Template template = target.getParentTemplate();
+		Location syncLocation = builder.createLocation(locationName, template);
+		builder.setLocationCommitted(syncLocation);
+		Edge syncEdge = builder.createEdge(template);
+		builder.setEdgeSource(syncEdge, syncLocation);		
+		builder.setEdgeTarget(syncEdge, target);
+		builder.setEdgeSync(syncEdge, sync, true);
+		return syncEdge;
+	}
 	
 }
