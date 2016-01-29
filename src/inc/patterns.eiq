@@ -171,6 +171,13 @@ pattern guardToExpression(guard : Guard, expression : Expression) {
 	Guard.expression(guard, expression);
 }
 
+pattern guardWithEventValue(expression : LogicalRelationExpression, name) {
+	Guard.expression(guard, expression);
+	LogicalRelationExpression.leftOperand(expression, left);
+	FeatureCall.feature(left, feature);
+	EventDefinition.name(feature, name);
+}
+
 // A guarddal rendelkezõ transitionöket adja vissza
 pattern edgesWithGuard(transition : Transition, guard : Guard, expression : Expression) {
 	Transition.trigger(transition, trigger);
@@ -186,6 +193,14 @@ pattern edgesWithRaisingEvent(transition : Transition, element : EventDefinition
 	EventRaisingExpression.event(raiseExpression, event);
 	ElementReferenceExpression.reference(event, element);
 	EventDefinition.name(element, name);
+}
+
+// Returns raising event elements that have assignment expression
+pattern raisingExpressionsWithAssignment(element : EventDefinition, value : Expression, name) {
+	EventRaisingExpression.event(raiseExpression, event);
+	ElementReferenceExpression.reference(event, element);
+	EventDefinition.name(element, name);
+	EventRaisingExpression.value(raiseExpression, value);
 }
 
 // Raising Event célpontjai
@@ -212,6 +227,11 @@ pattern edgesWithTimeTrigger(incomingTransition : Transition, triggerTransition 
 	Transition.trigger(triggerTransition, reactionTrigger);
 	ReactionTrigger.triggers(reactionTrigger, trigger);
 	TimeEventSpec.value(trigger, value);
+}
+
+pattern eventsWithType(event : EventDefinition, name) {
+	EventDefinition.name(event, name);
+	EventDefinition.type(event, _type);
 }
 
 // Leszedi az in eventket

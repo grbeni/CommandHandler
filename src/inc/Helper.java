@@ -272,6 +272,10 @@ public class Helper {
 		}
 	}
 	
+	public static String getInEventValueName(String eventName) throws IncQueryException {
+		return eventName + "Value";
+	}
+	
 	public static String getExpressionFromStateName(State state) throws IncQueryException {
 		final String process = "Process_";		
 		return process + getTemplateNameFromRegionName(state.getParentRegion()) + "." + state.getName();

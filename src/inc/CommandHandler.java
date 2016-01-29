@@ -14,12 +14,14 @@ import inc.util.EdgesWithRaisingEventQuerySpecification;
 import inc.util.EdgesWithTimeTriggerQuerySpecification;
 import inc.util.EdgesWithTriggerElementReferenceQuerySpecification;
 import inc.util.EntryOfRegionsQuerySpecification;
+import inc.util.EventsWithTypeQuerySpecification;
 import inc.util.ExitNodeSyncQuerySpecification;
 import inc.util.ExitNodesQuerySpecification;
 import inc.util.FinalStateEdgeQuerySpecification;
 import inc.util.FinalStatesQuerySpecification;
 import inc.util.InEventsQuerySpecification;
 import inc.util.InValuesQuerySpecification;
+import inc.util.RaisingExpressionsWithAssignmentQuerySpecification;
 import inc.util.SourceAndTargetOfTransitionsQuerySpecification;
 import inc.util.StatesQuerySpecification;
 import inc.util.TriggerOfTransitionQuerySpecification;
@@ -869,9 +871,16 @@ public class CommandHandler extends AbstractHandler {
 	private void setEdgeGuards() throws IncQueryException {
 		// Végigmegyünk minden transition-ön
 		EdgesWithGuardMatcher edgesWithGuardMatcher = engine.getMatcher(EdgesWithGuardQuerySpecification.instance());
+		EventsWithTypeMatcher eventsWithTypeMatcher = engine.getMatcher(EventsWithTypeQuerySpecification.instance());
 		for (EdgesWithGuardMatch edgesWithGuardMatch : edgesWithGuardMatcher.getAllMatches()) {
 			// Ha van guard-ja, akkor azt transzformáljuk, és ráírjuk az edge-re
 			String guard = UppaalCodeGenerator.transformExpression(edgesWithGuardMatch.getExpression());
+			for (EventsWithTypeMatch eventsWithTypeMatch : eventsWithTypeMatcher.getAllMatches()) {
+				if (guard.contains(eventsWithTypeMatch.getName())) {
+					guard = guard.replaceAll(eventsWithTypeMatch.getName(), Helper.getInEventValueName(eventsWithTypeMatch.getName()));	
+					builder.setEdgeSync(transitionEdgeMap.get(edgesWithGuardMatch.getTransition()), eventsWithTypeMatch.getName(), false);
+				}
+			}
 			if (builder.getEdgeGuard(transitionEdgeMap.get(edgesWithGuardMatch.getTransition())) != null && builder.getEdgeGuard(transitionEdgeMap.get(edgesWithGuardMatch.getTransition())) != "") {
 				builder.setEdgeGuard(transitionEdgeMap.get(edgesWithGuardMatch.getTransition()), builder.getEdgeGuard(transitionEdgeMap.get(edgesWithGuardMatch.getTransition())) + " && " + guard);
 			}
@@ -906,16 +915,14 @@ public class CommandHandler extends AbstractHandler {
 	private void createRaisingEventSyncs() throws Exception {
 		EdgesWithRaisingEventMatcher edgesWithRaisingEventMatcher = engine.getMatcher(EdgesWithRaisingEventQuerySpecification.instance());
 		EdgesWithTriggerElementReferenceMatcher edgesWithTriggerElementReferenceMatcher = engine.getMatcher(EdgesWithTriggerElementReferenceQuerySpecification.instance());
+		RaisingExpressionsWithAssignmentMatcher raisingExpressionsWithAssignmentMatcher = engine.getMatcher(RaisingExpressionsWithAssignmentQuerySpecification.instance());
 		for (EdgesWithRaisingEventMatch edgesWithRaisingEventMatch : edgesWithRaisingEventMatcher.getAllMatches()) {
 			builder.addGlobalDeclaration("broadcast chan " + edgesWithRaisingEventMatch.getName() + ";");
-			/*if (transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()).getSynchronization() != null) {
-				//throw new Exception("Baj van a raising cuccal, mert már van syncje.");
-			}
-			else {
-				builder.setEdgeSync(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()), edgesWithRaisingEventMatch.getName(), true);
-			}*/
 			Edge raiseEdge = createSyncLocationWithString(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()).getTarget(), "Raise_" + edgesWithRaisingEventMatch.getName(), edgesWithRaisingEventMatch.getName());
 			builder.setEdgeTarget(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()), raiseEdge.getSource());
+			for (RaisingExpressionsWithAssignmentMatch raisingExpressionsWithAssignmentMatch : raisingExpressionsWithAssignmentMatcher.getAllMatches(edgesWithRaisingEventMatch.getElement(), null, null)) {
+				 builder.setEdgeUpdate(raiseEdge, Helper.getInEventValueName(raisingExpressionsWithAssignmentMatch.getName()) + " = " + UppaalCodeGenerator.transformExpression(raisingExpressionsWithAssignmentMatch.getValue()));
+			}
 			for (EdgesWithTriggerElementReferenceMatch edgesWithTriggerElementReferenceMatch : edgesWithTriggerElementReferenceMatcher.getAllMatches()) {
 				if (edgesWithTriggerElementReferenceMatch.getElement() == edgesWithRaisingEventMatch.getElement()) {
 					if (transitionEdgeMap.get(edgesWithTriggerElementReferenceMatch.getTransition()).getSynchronization() != null) {
@@ -973,24 +980,46 @@ public class CommandHandler extends AbstractHandler {
 		Location controlLocation = builder.createLocation("triggerLocation", controlTemplate);
 		builder.setInitialLocation(controlLocation, controlTemplate);
 		
+		EventsWithTypeMatcher eventsWithTypeMatcher = engine.getMatcher(EventsWithTypeQuerySpecification.instance());
 		InEventsMatcher inEventsMatcher = engine.getMatcher(InEventsQuerySpecification.instance());
 		InValuesMatcher inValuesMatcher = engine.getMatcher(InValuesQuerySpecification.instance());
 		
+		for (EventsWithTypeMatch eventsWithTypeMatch : eventsWithTypeMatcher.getAllMatches()) {
+			if (eventsWithTypeMatch.getEvent().getType().getName() == "integer") {
+				builder.addGlobalDeclaration("int " + Helper.getInEventValueName(eventsWithTypeMatch.getName()) + ";");
+			}
+			else if (eventsWithTypeMatch.getEvent().getType().getName() == "boolean") {
+				builder.addGlobalDeclaration("bool " + Helper.getInEventValueName(eventsWithTypeMatch.getName()) + ";");
+			}
+		}
+		
 		for (InEventsMatch inEventsMatch : inEventsMatcher.getAllMatches()) {
+			builder.addGlobalDeclaration("broadcast chan " + inEventsMatch.getName() + ";");
+			Edge ownTriggerEdge = builder.createEdge(controlTemplate);
+			builder.setEdgeSource(ownTriggerEdge, controlLocation);
+			builder.setEdgeTarget(ownTriggerEdge, controlLocation);
+			builder.setEdgeSync(ownTriggerEdge, inEventsMatch.getName(), true);
 			if (inEventsMatch.getInEvent().getType() == null) {
-				Edge ownTriggerEdge = builder.createEdge(controlTemplate);
-				builder.setEdgeSource(ownTriggerEdge, controlLocation);
-				builder.setEdgeTarget(ownTriggerEdge, controlLocation);
-				builder.addGlobalDeclaration("broadcast chan " + inEventsMatch.getName() + ";");
-				builder.setEdgeSync(ownTriggerEdge, inEventsMatch.getName(), true);
+				//Edge ownTriggerEdge = builder.createEdge(controlTemplate);
+				//builder.setEdgeSource(ownTriggerEdge, controlLocation);
+				//builder.setEdgeTarget(ownTriggerEdge, controlLocation);
+				//builder.addGlobalDeclaration("broadcast chan " + inEventsMatch.getName() + ";");
+				//builder.setEdgeSync(ownTriggerEdge, inEventsMatch.getName(), true);
 			}
 			else if (inEventsMatch.getInEvent().getType().getName() == "integer") {
-				builder.addGlobalDeclaration("int " + inEventsMatch.getName() + ";");
+				Location updateLocation = builder.createLocation(inEventsMatch.getName() + "_updateLocation", controlTemplate);
+				builder.setLocationCommitted(updateLocation);				
 				for (InValuesMatch inValuesMatch : inValuesMatcher.getAllMatches()) {
-					Edge ownTriggerEdge = builder.createEdge(controlTemplate);
-					builder.setEdgeSource(ownTriggerEdge, controlLocation);
-					builder.setEdgeTarget(ownTriggerEdge, controlLocation);
-					builder.setEdgeUpdate(ownTriggerEdge, inEventsMatch.getName() + " = " + UppaalCodeGenerator.transformExpression(inValuesMatch.getInitialValue()));
+					//Edge ownTriggerEdge = builder.createEdge(controlTemplate);
+					//builder.setEdgeSource(ownTriggerEdge, controlLocation);
+					//builder.setEdgeTarget(ownTriggerEdge, controlLocation);
+					//builder.setEdgeUpdate(ownTriggerEdge, Helper.getInEventValueName(inEventsMatch.getName()) + " = " + UppaalCodeGenerator.transformExpression(inValuesMatch.getInitialValue()));
+					builder.setEdgeSource(ownTriggerEdge, updateLocation);
+					Edge updateEdge = builder.createEdge(controlTemplate);
+					builder.setEdgeSource(updateEdge, controlLocation);
+					builder.setEdgeTarget(updateEdge, updateLocation);
+					builder.setEdgeUpdate(updateEdge, Helper.getInEventValueName(inEventsMatch.getName()) + " = " + UppaalCodeGenerator.transformExpression(inValuesMatch.getInitialValue()));
+					//builder.setEdgeSync(ownTriggerEdge, inEventsMatch.getName(), true);
 				}
 			}
 		}		
