@@ -573,7 +573,7 @@ public class CommandHandler extends AbstractHandler {
 		VerticesOfRegionsMatcher verticesOfRegionsMatcher = engine.getMatcher(VerticesOfRegionsQuerySpecification.instance());
 		for (Region subregion : regionList) {
 			if (needInit) {
-				Location initLocation = builder.createLocation("Init", regionTemplateMap.get(subregion));
+				Location initLocation = builder.createLocation("GeneratedInit", regionTemplateMap.get(subregion));
 				Edge syncEdge = builder.createEdge(regionTemplateMap.get(subregion));
 				builder.setEdgeSync(syncEdge, syncChanVar + syncChanId, false);
 				builder.setEdgeUpdate(syncEdge, isActiveVar + " = " + ((toBeTrue) ? "true" : "false"));
@@ -995,7 +995,7 @@ public class CommandHandler extends AbstractHandler {
 	
 	/**
 	 * This method is responsible for placing the triggers on the mapped edges as synchronizations 
-	 * and duplicate edges if the trigger in the Yakindu model is composite.	 * 
+	 * and duplicate edges if the trigger in the Yakindu model is composite.
 	 * @param controlTemplate The control template, we want to handle the triggers from.
 	 * @param controlLocation The only location in the control template.
 	 * @throws Exception
