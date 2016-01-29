@@ -550,7 +550,7 @@ public class CommandHandler extends AbstractHandler {
 						builder.setEdgeSync(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), syncChanVar + (syncChanId), true);
 					}
 					else {
-						Edge syncEdge = createSyncLocation(stateLocationMap.get(sourceAndTargetOfTransitionsMatch.getTarget()), "CompositeSyncLocation" + (++id), null, regionTemplateMap.get(compositeStateMatch.getParentRegion()));
+						Edge syncEdge = createSyncLocation(stateLocationMap.get(sourceAndTargetOfTransitionsMatch.getTarget()), "CompositeSyncLocation" + (++id), null);
 						builder.setEdgeSync(syncEdge, syncChanVar + (syncChanId), true);
 						builder.setEdgeTarget(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), builder.getEdgeSource(syncEdge));
 					}
@@ -999,27 +999,15 @@ public class CommandHandler extends AbstractHandler {
 			builder.setEdgeSource(ownTriggerEdge, controlLocation);
 			builder.setEdgeTarget(ownTriggerEdge, controlLocation);
 			builder.setEdgeSync(ownTriggerEdge, inEventsMatch.getName(), true);
-			if (inEventsMatch.getInEvent().getType() == null) {
-				//Edge ownTriggerEdge = builder.createEdge(controlTemplate);
-				//builder.setEdgeSource(ownTriggerEdge, controlLocation);
-				//builder.setEdgeTarget(ownTriggerEdge, controlLocation);
-				//builder.addGlobalDeclaration("broadcast chan " + inEventsMatch.getName() + ";");
-				//builder.setEdgeSync(ownTriggerEdge, inEventsMatch.getName(), true);
-			}
-			else if (inEventsMatch.getInEvent().getType().getName() == "integer") {
+			if (inEventsMatch.getInEvent().getType() != null && inEventsMatch.getInEvent().getType().getName() == "integer") {
 				Location updateLocation = builder.createLocation(inEventsMatch.getName() + "_updateLocation", controlTemplate);
 				builder.setLocationCommitted(updateLocation);				
 				for (InValuesMatch inValuesMatch : inValuesMatcher.getAllMatches()) {
-					//Edge ownTriggerEdge = builder.createEdge(controlTemplate);
-					//builder.setEdgeSource(ownTriggerEdge, controlLocation);
-					//builder.setEdgeTarget(ownTriggerEdge, controlLocation);
-					//builder.setEdgeUpdate(ownTriggerEdge, Helper.getInEventValueName(inEventsMatch.getName()) + " = " + UppaalCodeGenerator.transformExpression(inValuesMatch.getInitialValue()));
 					builder.setEdgeSource(ownTriggerEdge, updateLocation);
 					Edge updateEdge = builder.createEdge(controlTemplate);
 					builder.setEdgeSource(updateEdge, controlLocation);
 					builder.setEdgeTarget(updateEdge, updateLocation);
 					builder.setEdgeUpdate(updateEdge, Helper.getInEventValueName(inEventsMatch.getName()) + " = " + UppaalCodeGenerator.transformExpression(inValuesMatch.getInitialValue()));
-					//builder.setEdgeSync(ownTriggerEdge, inEventsMatch.getName(), true);
 				}
 			}
 		}		
@@ -1044,7 +1032,7 @@ public class CommandHandler extends AbstractHandler {
 			}
 			// If the mapped edge already has a sync, we have to create a syncing location
 			if (transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization() != null) {
-				Edge syncEdge = createSyncLocation(builder.getEdgeTarget(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition())), "triggerLocation" + (++id), transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization(), regionTemplateMap.get(triggerOfTransitionMatch.getParentRegion()));
+				Edge syncEdge = createSyncLocation(builder.getEdgeTarget(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition())), "triggerLocation" + (++id), transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization());
 				builder.setEdgeTarget(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), builder.getEdgeSource(syncEdge));
 				builder.setEdgeSync(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), triggerOfTransitionMatch.getTriggerName(), false);
 				triggeredTransitions.add(triggerOfTransitionMatch.getTransition());
@@ -1066,10 +1054,11 @@ public class CommandHandler extends AbstractHandler {
 	 * @return A szinkronizáció edge, amely a létrehozott locationbõl belevezet a target locationbe.
 	 * @throws Exception Ezt akkor dobja, ha az átadott szinkornizáció ? szinkornizáció. Ekkor a létrehozott struktúra nem mûködhet jól.
 	 */
-	private Edge createSyncLocation(Location target, String locationName, Synchronization sync, Template template) throws Exception {
+	private Edge createSyncLocation(Location target, String locationName, Synchronization sync) throws Exception {
 		if (sync != null && sync.getKind().getValue() == 0) {
 			throw new Exception("Egy ? sync-et akar áthelyezni!");
 		}
+		Template template = target.getParentTemplate();
 		Location syncLocation = builder.createLocation(locationName, template);
 		builder.setLocationCommitted(syncLocation);
 		Edge syncEdge = builder.createEdge(template);
