@@ -19,6 +19,7 @@ import inc.util.ExitNodeSyncQuerySpecification;
 import inc.util.ExitNodesQuerySpecification;
 import inc.util.FinalStateEdgeQuerySpecification;
 import inc.util.FinalStatesQuerySpecification;
+import inc.util.InEventValuesQuerySpecification;
 import inc.util.InEventsQuerySpecification;
 import inc.util.InValuesQuerySpecification;
 import inc.util.RaisingExpressionsWithAssignmentQuerySpecification;
@@ -983,6 +984,7 @@ public class CommandHandler extends AbstractHandler {
 		EventsWithTypeMatcher eventsWithTypeMatcher = engine.getMatcher(EventsWithTypeQuerySpecification.instance());
 		InEventsMatcher inEventsMatcher = engine.getMatcher(InEventsQuerySpecification.instance());
 		InValuesMatcher inValuesMatcher = engine.getMatcher(InValuesQuerySpecification.instance());
+		InEventValuesMatcher inEventValuesMatcher = engine.getMatcher(InEventValuesQuerySpecification.instance());
 		
 		for (EventsWithTypeMatch eventsWithTypeMatch : eventsWithTypeMatcher.getAllMatches()) {
 			if (eventsWithTypeMatch.getEvent().getType().getName() == "integer") {
@@ -1001,13 +1003,21 @@ public class CommandHandler extends AbstractHandler {
 			builder.setEdgeSync(ownTriggerEdge, inEventsMatch.getName(), true);
 			if (inEventsMatch.getInEvent().getType() != null && inEventsMatch.getInEvent().getType().getName() == "integer") {
 				Location updateLocation = builder.createLocation(inEventsMatch.getName() + "_updateLocation", controlTemplate);
-				builder.setLocationCommitted(updateLocation);				
+				builder.setLocationCommitted(updateLocation);		
+				//createUpdateValueEdge
 				for (InValuesMatch inValuesMatch : inValuesMatcher.getAllMatches()) {
 					builder.setEdgeSource(ownTriggerEdge, updateLocation);
 					Edge updateEdge = builder.createEdge(controlTemplate);
 					builder.setEdgeSource(updateEdge, controlLocation);
 					builder.setEdgeTarget(updateEdge, updateLocation);
 					builder.setEdgeUpdate(updateEdge, Helper.getInEventValueName(inEventsMatch.getName()) + " = " + UppaalCodeGenerator.transformExpression(inValuesMatch.getInitialValue()));
+				}
+				for (InEventValuesMatch inEventValuesMatch : inEventValuesMatcher.getAllMatches()) {
+					builder.setEdgeSource(ownTriggerEdge, updateLocation);
+					Edge updateEdge = builder.createEdge(controlTemplate);
+					builder.setEdgeSource(updateEdge, controlLocation);
+					builder.setEdgeTarget(updateEdge, updateLocation);
+					builder.setEdgeUpdate(updateEdge, Helper.getInEventValueName(inEventsMatch.getName()) + " = " + UppaalCodeGenerator.transformExpression(inEventValuesMatch.getRightOperand()));
 				}
 			}
 		}		

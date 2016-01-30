@@ -172,10 +172,21 @@ pattern guardToExpression(guard : Guard, expression : Expression) {
 }
 
 pattern guardWithEventValue(expression : LogicalRelationExpression, name) {
-	Guard.expression(guard, expression);
+	Guard.expression(_guard, expression);
 	LogicalRelationExpression.leftOperand(expression, left);
 	FeatureCall.feature(left, feature);
 	EventDefinition.name(feature, name);
+}
+
+
+// Returns those right operands that are compared to a typed in-event in a guard
+pattern inEventValues(rightOperand : Expression) {
+	Guard.expression(_guard, expression);
+	LogicalRelationExpression.leftOperand(expression, left);
+	EventValueReferenceExpression.value(left, value);
+	FeatureCall.feature(value, event);
+	EventDefinition(event);	
+	LogicalRelationExpression.rightOperand(expression, rightOperand);
 }
 
 // A guarddal rendelkezõ transitionöket adja vissza
