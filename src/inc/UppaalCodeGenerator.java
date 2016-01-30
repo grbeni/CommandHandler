@@ -115,7 +115,7 @@ public class UppaalCodeGenerator {
 				EventDefinition variable = (EventDefinition) featureCall.getFeature();
 				return variable.getName();
 			}
-			return "Az FeatureCall feature-e nem VariableDefinition. :(";
+			throw new UnsupportedOperationException("Nem ismert kifejezés. :( " + expression.getClass().toGenericString());
 		}
 		// Ha a kifejezés egy elemhivatkozás, megnézem az elemet, és ha változó, visszaadom a nevét
 		else if (expression instanceof ElementReferenceExpression) {
@@ -124,7 +124,11 @@ public class UppaalCodeGenerator {
 				VariableDefinition variable = (VariableDefinition) elementReference.getReference();
 				return variable.getName();
 			}
-			return "Az ElementReferenceExpression reference-e nem VariableDefinition. :(";
+			if (elementReference.getReference() instanceof EventDefinition) {
+				EventDefinition event = (EventDefinition) elementReference.getReference();
+				return event.getName();
+			}
+			throw new UnsupportedOperationException("Nem ismert kifejezés. :( " + expression.getClass().toGenericString());
 		}
 		// Ha a kifejezés egy logikai reláció: Transzformálom a baloldalt, kiírom a relációs jelet, majd transzformálom a jobboldalt
 		else if (expression instanceof LogicalRelationExpression) {

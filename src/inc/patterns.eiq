@@ -207,7 +207,9 @@ pattern edgesWithRaisingEvent(transition : Transition, element : EventDefinition
 }
 
 // Returns raising event elements that have assignment expression
-pattern raisingExpressionsWithAssignment(element : EventDefinition, value : Expression, name) {
+pattern raisingExpressionsWithAssignment(transition : Transition, element : EventDefinition, value : Expression, name) {
+	Transition.effect(transition, reactionEffect);
+	ReactionEffect.actions(reactionEffect, raiseExpression);
 	EventRaisingExpression.event(raiseExpression, event);
 	ElementReferenceExpression.reference(event, element);
 	EventDefinition.name(element, name);
@@ -215,13 +217,14 @@ pattern raisingExpressionsWithAssignment(element : EventDefinition, value : Expr
 }
 
 // Raising Event célpontjai
+/*
 pattern edgesWithTriggerElementReference(transition : Transition, element : EventDefinition, name){
 	Transition.trigger(transition, reactionTrigger);
 	ReactionTrigger.triggers(reactionTrigger, trigger);
 	RegularEventSpec.event(trigger, event);
 	ElementReferenceExpression.reference(event, element);
 	EventDefinition.name(element, name);
-}
+}*/
 
 // Adott composite state regionjeiben az entry node-ból kimenõ éleket adja vissza
 pattern edgesFromEntryOfParallelRegions(compositeState : State, transition : Transition) {
@@ -258,6 +261,13 @@ pattern triggerOfTransition(transition : Transition, parentRegion : Region, feat
 	ReactionTrigger.triggers(trigger, aTrigger);
 	RegularEventSpec.event(aTrigger, event);
 	FeatureCall.feature(event, feature);
+	EventDefinition.name(feature, triggerName);
+} or {
+	Transition.source.parentRegion(transition, parentRegion);
+	Transition.trigger(transition, trigger);
+	ReactionTrigger.triggers(trigger, aTrigger);
+	RegularEventSpec.event(aTrigger, event);
+	ElementReferenceExpression.reference(event, feature);
 	EventDefinition.name(feature, triggerName);
 }
 
