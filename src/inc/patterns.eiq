@@ -199,10 +199,15 @@ pattern edgesWithGuard(transition : Transition, guard : Guard, expression : Expr
 // Raising eventtel rendelkezõ edge-eket adja meg
 pattern edgesWithRaisingEvent(transition : Transition, element : EventDefinition, name){
 	Transition.effect(transition, effect);	
-	Reaction.effect(_reaction, effect);
 	find reactionEffectToExpression(effect, raiseExpression);
 	EventRaisingExpression.event(raiseExpression, event);
 	ElementReferenceExpression.reference(event, element);
+	EventDefinition.name(element, name);
+} or {
+	Transition.effect(transition, effect);	
+	find reactionEffectToExpression(effect, raiseExpression);
+	EventRaisingExpression.event(raiseExpression, event);
+	FeatureCall.feature(event, element);
 	EventDefinition.name(element, name);
 }
 
@@ -212,6 +217,13 @@ pattern raisingExpressionsWithAssignment(transition : Transition, element : Even
 	ReactionEffect.actions(reactionEffect, raiseExpression);
 	EventRaisingExpression.event(raiseExpression, event);
 	ElementReferenceExpression.reference(event, element);
+	EventDefinition.name(element, name);
+	EventRaisingExpression.value(raiseExpression, value);
+} or {
+	Transition.effect(transition, reactionEffect);
+	ReactionEffect.actions(reactionEffect, raiseExpression);
+	EventRaisingExpression.event(raiseExpression, event);
+	FeatureCall.feature(event, element);
 	EventDefinition.name(element, name);
 	EventRaisingExpression.value(raiseExpression, value);
 }

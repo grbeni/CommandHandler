@@ -918,12 +918,13 @@ public class CommandHandler extends AbstractHandler {
 		EdgesWithRaisingEventMatcher edgesWithRaisingEventMatcher = engine.getMatcher(EdgesWithRaisingEventQuerySpecification.instance());
 		RaisingExpressionsWithAssignmentMatcher raisingExpressionsWithAssignmentMatcher = engine.getMatcher(RaisingExpressionsWithAssignmentQuerySpecification.instance());
 		Set<String> raisingEvents = new HashSet<String>();
+		int id = 0;
 		for (EdgesWithRaisingEventMatch edgesWithRaisingEventMatch : edgesWithRaisingEventMatcher.getAllMatches()) {
 			if (!raisingEvents.contains(edgesWithRaisingEventMatch.getName())) {
 				builder.addGlobalDeclaration("broadcast chan " + edgesWithRaisingEventMatch.getName() + ";");
 				raisingEvents.add(edgesWithRaisingEventMatch.getName());
 			}
-			Edge raiseEdge = createSyncLocationWithString(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()).getTarget(), "Raise_" + edgesWithRaisingEventMatch.getName(), edgesWithRaisingEventMatch.getName());
+			Edge raiseEdge = createSyncLocationWithString(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()).getTarget(), "Raise_" + edgesWithRaisingEventMatch.getName() + (id++), edgesWithRaisingEventMatch.getName());
 			builder.setEdgeTarget(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()), raiseEdge.getSource());
 			for (RaisingExpressionsWithAssignmentMatch raisingExpressionsWithAssignmentMatch : raisingExpressionsWithAssignmentMatcher.getAllMatches(edgesWithRaisingEventMatch.getTransition(), edgesWithRaisingEventMatch.getElement(), null, null)) {
 				 builder.setEdgeUpdate(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()), Helper.getInEventValueName(raisingExpressionsWithAssignmentMatch.getName()) + " = " + UppaalCodeGenerator.transformExpression(raisingExpressionsWithAssignmentMatch.getValue()));
@@ -1027,9 +1028,9 @@ public class CommandHandler extends AbstractHandler {
 			}
 			// If the mapped edge already has a sync, we have to create a syncing location
 			if (transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization() != null) {
-				if (transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization().getKind() == SynchronizationKind.SEND) {
+				/*if (transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization().getKind() == SynchronizationKind.SEND) {
 					throw new Exception(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSource().getName() + "->" + transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getTarget().getName() + " already has a ! sync.");
-				}
+				}*/
 				Edge syncEdge = createSyncLocation(builder.getEdgeTarget(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition())), "triggerLocation" + (++id), transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization());
 				builder.setEdgeTarget(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), builder.getEdgeSource(syncEdge));
 				builder.setEdgeSync(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), triggerOfTransitionMatch.getTriggerName(), false);
