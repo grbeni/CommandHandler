@@ -216,16 +216,6 @@ pattern raisingExpressionsWithAssignment(transition : Transition, element : Even
 	EventRaisingExpression.value(raiseExpression, value);
 }
 
-// Raising Event célpontjai
-/*
-pattern edgesWithTriggerElementReference(transition : Transition, element : EventDefinition, name){
-	Transition.trigger(transition, reactionTrigger);
-	ReactionTrigger.triggers(reactionTrigger, trigger);
-	RegularEventSpec.event(trigger, event);
-	ElementReferenceExpression.reference(event, element);
-	EventDefinition.name(element, name);
-}*/
-
 // Adott composite state regionjeiben az entry node-ból kimenõ éleket adja vissza
 pattern edgesFromEntryOfParallelRegions(compositeState : State, transition : Transition) {
 	State.regions(compositeState, region);

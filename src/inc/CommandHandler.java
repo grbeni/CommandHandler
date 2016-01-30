@@ -916,7 +916,6 @@ public class CommandHandler extends AbstractHandler {
 	 */
 	private void createRaisingEventSyncs() throws Exception {
 		EdgesWithRaisingEventMatcher edgesWithRaisingEventMatcher = engine.getMatcher(EdgesWithRaisingEventQuerySpecification.instance());
-		//EdgesWithTriggerElementReferenceMatcher edgesWithTriggerElementReferenceMatcher = engine.getMatcher(EdgesWithTriggerElementReferenceQuerySpecification.instance());
 		RaisingExpressionsWithAssignmentMatcher raisingExpressionsWithAssignmentMatcher = engine.getMatcher(RaisingExpressionsWithAssignmentQuerySpecification.instance());
 		Set<String> raisingEvents = new HashSet<String>();
 		for (EdgesWithRaisingEventMatch edgesWithRaisingEventMatch : edgesWithRaisingEventMatcher.getAllMatches()) {
@@ -929,19 +928,6 @@ public class CommandHandler extends AbstractHandler {
 			for (RaisingExpressionsWithAssignmentMatch raisingExpressionsWithAssignmentMatch : raisingExpressionsWithAssignmentMatcher.getAllMatches(edgesWithRaisingEventMatch.getTransition(), edgesWithRaisingEventMatch.getElement(), null, null)) {
 				 builder.setEdgeUpdate(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()), Helper.getInEventValueName(raisingExpressionsWithAssignmentMatch.getName()) + " = " + UppaalCodeGenerator.transformExpression(raisingExpressionsWithAssignmentMatch.getValue()));
 			}
-			/*for (EdgesWithTriggerElementReferenceMatch edgesWithTriggerElementReferenceMatch : edgesWithTriggerElementReferenceMatcher.getAllMatches()) {
-				if (edgesWithTriggerElementReferenceMatch.getElement() == edgesWithRaisingEventMatch.getElement()) {
-					if (transitionEdgeMap.get(edgesWithTriggerElementReferenceMatch.getTransition()).getSynchronization() != null) {
-						throw new Exception("Baj van a raising cuccal, mert már van syncje. " + transitionEdgeMap.get(edgesWithTriggerElementReferenceMatch.getTransition()).getSynchronization().getChannelExpression() +
-								"\n" + transitionEdgeMap.get(edgesWithTriggerElementReferenceMatch.getTransition()).getSource().getName() +
-								"->" + transitionEdgeMap.get(edgesWithTriggerElementReferenceMatch.getTransition()).getTarget().getName() + 
-								"\n" + edgesWithRaisingEventMatch.getName());
-					}
-					else {
-						builder.setEdgeSync(transitionEdgeMap.get(edgesWithTriggerElementReferenceMatch.getTransition()), edgesWithRaisingEventMatch.getName(), false);
-					}
-				}
-			}*/
 		}
 	}
 	
