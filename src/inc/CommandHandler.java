@@ -22,6 +22,7 @@ import inc.util.FinalStatesQuerySpecification;
 import inc.util.InEventValuesQuerySpecification;
 import inc.util.InEventsQuerySpecification;
 import inc.util.InValuesQuerySpecification;
+import inc.util.LocalReactionPlainQuerySpecification;
 import inc.util.LocalReactionValueOfEffectQuerySpecification;
 import inc.util.RaisingExpressionsWithAssignmentQuerySpecification;
 import inc.util.SourceAndTargetOfTransitionsQuerySpecification;
@@ -57,8 +58,13 @@ import org.yakindu.sct.model.sgraph.Region;
 import org.yakindu.sct.model.sgraph.State;
 import org.yakindu.sct.model.sgraph.Statechart;
 import org.yakindu.sct.model.sgraph.Transition;
+import org.yakindu.sct.model.sgraph.Trigger;
 import org.yakindu.sct.model.sgraph.Vertex;
 import org.yakindu.sct.model.stext.stext.EventRaisingExpression;
+import org.yakindu.sct.model.stext.stext.EventSpec;
+import org.yakindu.sct.model.stext.stext.LocalReaction;
+import org.yakindu.sct.model.stext.stext.ReactionTrigger;
+import org.yakindu.sct.model.stext.stext.RegularEventSpec;
 
 import de.uni_paderborn.uppaal.templates.Edge;
 import de.uni_paderborn.uppaal.templates.Location;
@@ -880,13 +886,12 @@ public class CommandHandler extends AbstractHandler {
 	 * @throws Exception
 	 */
 	private void createLocalReactions() throws Exception {
-		LocalReactionValueOfEffectMatcher localReactionValueOfEffectMatcher = engine.getMatcher(LocalReactionValueOfEffectQuerySpecification.instance());
-		for (LocalReactionValueOfGuardMatch localReactionValueOfGuardMatch : runOnceEngine.getAllMatches(LocalReactionValueOfGuardMatcher.querySpecification())) {
+		String guard = null;
+		for (LocalReactionOnlyGuardMatch localReactionValueOfGuardMatch : runOnceEngine.getAllMatches(LocalReactionOnlyGuardMatcher.querySpecification())) {
 			Location stateLocation = stateLocationMap.get(localReactionValueOfGuardMatch.getState());
 			Edge localReactionEdge = builder.createEdge(stateLocation.getParentTemplate());
 			builder.setEdgeSource(localReactionEdge, stateLocation);
-			builder.setEdgeTarget(localReactionEdge, stateLocation);
-			String guard = null;
+			builder.setEdgeTarget(localReactionEdge, stateLocation);			
 			if (Helper.isEventName(localReactionValueOfGuardMatch.getName())) {
 				guard = Helper.getInEventValueName(localReactionValueOfGuardMatch.getName()) + " " + localReactionValueOfGuardMatch.getOperator().getLiteral() + " " + UppaalCodeGenerator.transformExpression(localReactionValueOfGuardMatch.getGuardRightOperand());
 				builder.setEdgeSync(localReactionEdge, localReactionValueOfGuardMatch.getName(), false);
@@ -895,14 +900,34 @@ public class CommandHandler extends AbstractHandler {
 				guard = localReactionValueOfGuardMatch.getName() + " " + localReactionValueOfGuardMatch.getOperator().getLiteral() + " " + UppaalCodeGenerator.transformExpression(localReactionValueOfGuardMatch.getGuardRightOperand());				
 			}
 			builder.setEdgeGuard(localReactionEdge, guard);
-			for (LocalReactionValueOfEffectMatch localReactionValueOfEffectMatch : localReactionValueOfEffectMatcher.getAllMatches(localReactionValueOfGuardMatch.getLocalReaction(), null)) {
-				builder.setEdgeUpdate(localReactionEdge, UppaalCodeGenerator.transformExpression(localReactionValueOfEffectMatch.getAction()));
-					if (localReactionValueOfEffectMatch.getAction() instanceof EventRaisingExpression) {
-						EventRaisingExpression eventRaisingExpression = (EventRaisingExpression) localReactionValueOfEffectMatch.getAction();
-						Edge syncEdge = createSyncLocationWithString(localReactionEdge.getTarget(), "Raise_" + UppaalCodeGenerator.transformExpression(eventRaisingExpression.getEvent()) + (raiseId++), UppaalCodeGenerator.transformExpression(eventRaisingExpression.getEvent()));
-						builder.setEdgeTarget(localReactionEdge, syncEdge.getSource());
-						builder.setEdgeUpdate(localReactionEdge, Helper.getInEventValueName(UppaalCodeGenerator.transformExpression(eventRaisingExpression.getEvent())) + " = " + UppaalCodeGenerator.transformExpression(eventRaisingExpression.getValue()));
-					}
+			createRaisingLocationForLocalReaction(localReactionValueOfGuardMatch.getLocalReaction(), localReactionEdge);
+		}
+		for (LocalReactionPlainMatch localReactionPlainMatch : runOnceEngine.getAllMatches(LocalReactionPlainMatcher.querySpecification())) {
+			Location stateLocation = stateLocationMap.get(localReactionPlainMatch.getState());
+			Edge localReactionEdge = builder.createEdge(stateLocation.getParentTemplate());
+			builder.setEdgeSource(localReactionEdge, stateLocation);
+			builder.setEdgeTarget(localReactionEdge, stateLocation);
+			builder.setEdgeSync(localReactionEdge, UppaalCodeGenerator.transformExpression(localReactionPlainMatch.getExpression()), false);
+			if (localReactionPlainMatch.getReactionTrigger().getGuard() != null) {
+				guard = UppaalCodeGenerator.transformExpression(localReactionPlainMatch.getReactionTrigger().getGuard().getExpression());
+				builder.setEdgeGuard(localReactionEdge, guard);
+			}
+			createRaisingLocationForLocalReaction(localReactionPlainMatch.getLocalReaction(), localReactionEdge);
+		}
+		
+	}
+	
+	private void createRaisingLocationForLocalReaction(LocalReaction localReaction, Edge localReactionEdge) throws Exception {
+		LocalReactionValueOfEffectMatcher localReactionValueOfEffectMatcher = engine.getMatcher(LocalReactionValueOfEffectQuerySpecification.instance());
+		for (LocalReactionValueOfEffectMatch localReactionValueOfEffectMatch : localReactionValueOfEffectMatcher.getAllMatches(localReaction, null)) {
+			builder.setEdgeUpdate(localReactionEdge, UppaalCodeGenerator.transformExpression(localReactionValueOfEffectMatch.getAction()));
+			if (localReactionValueOfEffectMatch.getAction() instanceof EventRaisingExpression) {
+				EventRaisingExpression eventRaisingExpression = (EventRaisingExpression) localReactionValueOfEffectMatch.getAction();
+				Edge syncEdge = createSyncLocationWithString(localReactionEdge.getTarget(), "Raise_" + UppaalCodeGenerator.transformExpression(eventRaisingExpression.getEvent()) + (raiseId++), UppaalCodeGenerator.transformExpression(eventRaisingExpression.getEvent()));
+				builder.setEdgeTarget(localReactionEdge, syncEdge.getSource());
+				if (eventRaisingExpression.getValue() != null) {
+					builder.setEdgeUpdate(localReactionEdge, Helper.getInEventValueName(UppaalCodeGenerator.transformExpression(eventRaisingExpression.getEvent())) + " = " + UppaalCodeGenerator.transformExpression(eventRaisingExpression.getValue()));
+				}
 			}
 		}
 	}

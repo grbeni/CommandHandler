@@ -155,9 +155,14 @@ pattern events(eventName) {
 	EventDefinition.name(_event, eventName);
 }
 
-pattern localReactionWithGuard(state : State, localReaction : LocalReaction, guardLeftOperand : Expression, guardRightOperand : Expression, operator) {
+pattern reactionTriggerToTrigger(reactionTrigger : ReactionTrigger) {
+	ReactionTrigger.triggers(reactionTrigger, _trigger);
+}
+
+pattern localReactionWithOnlyGuard(state : State, localReaction : LocalReaction, guardLeftOperand : Expression, guardRightOperand : Expression, operator) {
 	State.localReactions(state, localReaction);
 	LocalReaction.trigger(localReaction, trigger);
+	neg find reactionTriggerToTrigger(trigger);
 	ReactionTrigger.guard(trigger, guard);
 	Guard.expression(guard, expression);
 	LogicalRelationExpression.leftOperand(expression, guardLeftOperand);
@@ -165,19 +170,27 @@ pattern localReactionWithGuard(state : State, localReaction : LocalReaction, gua
 	LogicalRelationExpression.operator(expression, operator);
 }
 
-pattern localReactionValueOfGuard(state : State, localReaction : LocalReaction, guardRightOperand : Expression, name, operator) {		
-	find localReactionWithGuard(state, localReaction, guardLeftOperand, guardRightOperand, operator);
+pattern localReactionOnlyGuard(state : State, localReaction : LocalReaction, guardRightOperand : Expression, name, operator) {		
+	find localReactionWithOnlyGuard(state, localReaction, guardLeftOperand, guardRightOperand, operator);
 	EventValueReferenceExpression.value(guardLeftOperand, value);
 	FeatureCall.feature(value, feature);
 	EventDefinition.name(feature, name);
 } or {
-	find localReactionWithGuard(state, localReaction, guardLeftOperand, guardRightOperand, operator);
+	find localReactionWithOnlyGuard(state, localReaction, guardLeftOperand, guardRightOperand, operator);
 	FeatureCall.feature(guardLeftOperand, feature);
 	VariableDefinition.name(feature, name);
 } or {
-	find localReactionWithGuard(state, localReaction, guardLeftOperand, guardRightOperand, operator);
+	find localReactionWithOnlyGuard(state, localReaction, guardLeftOperand, guardRightOperand, operator);
 	ElementReferenceExpression.reference(guardLeftOperand, reference);
 	VariableDefinition.name(reference, name);	
+}
+
+pattern localReactionPlain(state : State, localReaction : LocalReaction, reactionTrigger : ReactionTrigger, expression : Expression) {
+	State.localReactions(state, localReaction);
+	LocalReaction.trigger(localReaction, reactionTrigger);
+	ReactionTrigger.triggers(reactionTrigger, trigger);
+	RegularEventSpec.event(trigger, expression);
+	neg find localReactionWithOnlyGuard(state, localReaction, _guardLeftOperand, _guardRightOperand, _operator);	
 }
 
 pattern localReactionValueOfEffect(localReaction : LocalReaction, action : Expression) {
