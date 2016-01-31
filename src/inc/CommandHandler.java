@@ -942,10 +942,10 @@ public class CommandHandler extends AbstractHandler {
 		EventsWithTypeMatcher eventsWithTypeMatcher = engine.getMatcher(EventsWithTypeQuerySpecification.instance());
 		for (EdgesWithGuardMatch edgesWithGuardMatch : edgesWithGuardMatcher.getAllMatches()) {
 			// Ha van guard-ja, akkor azt transzform·ljuk, Ès r·Ìrjuk az edge-re
-			String guard = UppaalCodeGenerator.transformExpression(edgesWithGuardMatch.getExpression());
+			String guard = " " + UppaalCodeGenerator.transformExpression(edgesWithGuardMatch.getExpression());
 			for (EventsWithTypeMatch eventsWithTypeMatch : eventsWithTypeMatcher.getAllMatches()) {
-				if (guard.contains(eventsWithTypeMatch.getName())) {
-					guard = guard.replaceAll(eventsWithTypeMatch.getName(), Helper.getInEventValueName(eventsWithTypeMatch.getName()));	
+				if (guard.contains(" " + eventsWithTypeMatch.getName() + " ")) {
+					guard = guard.replaceAll(" " + eventsWithTypeMatch.getName() + " ", " " + Helper.getInEventValueName(eventsWithTypeMatch.getName()) + " ");	
 					builder.setEdgeSync(transitionEdgeMap.get(edgesWithGuardMatch.getTransition()), eventsWithTypeMatch.getName(), false);
 				}
 			}
