@@ -873,13 +873,17 @@ public class CommandHandler extends AbstractHandler {
 		}
 	}
 	
-	private void createLocalReactions() throws Exception {	
+	/**
+	 * Creates local reactions as a loop edge or two edges with a sync location.
+	 * @throws Exception
+	 */
+	private void createLocalReactions() throws Exception {
 		for (LocalReactionValueOfGuardMatch localReactionValueOfGuardMatch : runOnceEngine.getAllMatches(LocalReactionValueOfGuardMatcher.querySpecification())) {
 			Location stateLocation = stateLocationMap.get(localReactionValueOfGuardMatch.getState());
 			Edge localReactionEdge = builder.createEdge(stateLocation.getParentTemplate());
 			builder.setEdgeSource(localReactionEdge, stateLocation);
 			builder.setEdgeTarget(localReactionEdge, stateLocation);
-			String guard = Helper.getInEventValueName(localReactionValueOfGuardMatch.getEventName()) + " == " + UppaalCodeGenerator.transformExpression(localReactionValueOfGuardMatch.getGuardRightOperand());
+			String guard = Helper.getInEventValueName(localReactionValueOfGuardMatch.getEventName()) + " "+ localReactionValueOfGuardMatch.getOperator().getLiteral() + " " + UppaalCodeGenerator.transformExpression(localReactionValueOfGuardMatch.getGuardRightOperand());
 			builder.setEdgeGuard(localReactionEdge, guard);
 			builder.setEdgeSync(localReactionEdge, localReactionValueOfGuardMatch.getEventName(), false);
 			for (LocalReactionValueOfEffectMatch localReactionValueOfEffectMatch : runOnceEngine.getAllMatches(LocalReactionValueOfEffectMatcher.querySpecification())) {

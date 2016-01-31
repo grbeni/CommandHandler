@@ -8,21 +8,6 @@ import "http://www.yakindu.org/base/base/2.0.0"
 import "http://www.yakindu.org/sct/statechart/SText"
 import epackage "http://www.yakindu.org/base/expressions/Expressions"
 
-
-// Beni patternje
-pattern SatechartToStateName(stateChart : Statechart, name, state : State, region : Region) {
-	Statechart.regions.vertices(stateChart, state);
-	State.name(state, name);
-	State.parentRegion(state, region);
-}
-
-
-// Beni patternje
-pattern getEntry(region : Region, entry : Entry, name) {
-	Region.vertices.name(region, name);
-	Entry.name(entry, name);
-}
-
 // Változók lekérése
 pattern variableDefinitions(variable : VariableDefinition, name, isReadonly, type) {
 	VariableDefinition.name(variable, name);
@@ -167,10 +152,10 @@ pattern statesWithExitEventWithoutOutgoingTransition(state : State, expression :
 }
 
 pattern events(eventName) {
-	EventDefinition.name(event, eventName);
+	EventDefinition.name(_event, eventName);
 }
 
-pattern localReactionValueOfGuard(state : State, localReaction : LocalReaction, guardRightOperand : Expression, eventName) {		
+pattern localReactionValueOfGuard(state : State, localReaction : LocalReaction, guardRightOperand : Expression, eventName, operator) {		
 	State.localReactions(state, localReaction);
 	LocalReaction.trigger(localReaction, trigger);
 	ReactionTrigger.guard(trigger, guard);
@@ -180,6 +165,7 @@ pattern localReactionValueOfGuard(state : State, localReaction : LocalReaction, 
 	FeatureCall.feature(value, feature);
 	EventDefinition.name(feature, eventName);
 	LogicalRelationExpression.rightOperand(expression, guardRightOperand);	
+	LogicalRelationExpression.operator(expression, operator);
 }
 
 pattern localReactionValueOfEffect(localReaction : LocalReaction, action : Expression) {
@@ -191,13 +177,6 @@ pattern localReactionValueOfEffect(localReaction : LocalReaction, action : Expre
 pattern guardToExpression(guard : Guard, expression : Expression) {
 	Guard.expression(guard, expression);
 }
-/*
-pattern guardWithEventValue(expression : LogicalRelationExpression, name) {
-	Guard.expression(_guard, expression);
-	LogicalRelationExpression.leftOperand(expression, left);
-	FeatureCall.feature(left, feature);
-	EventDefinition.name(feature, name);
-}*/
 
 // Returns those right operands that are compared to a typed in-event in a guard
 pattern inEventValues(rightOperand : Expression) {
