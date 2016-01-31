@@ -153,7 +153,7 @@ public class UppaalCodeGenerator {
 		// Ha egy zárójeles kifejezés: kiteszek zárójeleket, és a köztük lévõ kifejezést transzformálom
 		else if (expression instanceof ParenthesizedExpression) {
 			ParenthesizedExpression parent = (ParenthesizedExpression) expression;
-			return "(" + transformExpression(parent.getExpression()) + ")";
+			return "( " + transformExpression(parent.getExpression()) + " )";
 		}
 		else if (expression instanceof EventRaisingExpression) {
 			// Ekkor nem a transitionre írunk rá, hanem sync csatornát hozunk létre
