@@ -166,18 +166,34 @@ pattern statesWithExitEventWithoutOutgoingTransition(state : State, expression :
 	find reactionEffectToExpression(effect, expression);
 }
 
+pattern localReactionValueOfGuard(state : State, localReaction : LocalReaction, guardRightOperand : Expression, eventName) {		
+	State.localReactions(state, localReaction);
+	LocalReaction.trigger(localReaction, trigger);
+	ReactionTrigger.guard(trigger, guard);
+	Guard.expression(guard, expression);
+	LogicalRelationExpression.leftOperand(expression, left);
+	EventValueReferenceExpression.value(left, value);
+	FeatureCall.feature(value, feature);
+	EventDefinition.name(feature, eventName);
+	LogicalRelationExpression.rightOperand(expression, guardRightOperand);	
+}
+
+pattern localReactionValueOfEffect(localReaction : LocalReaction, action : Expression) {
+	LocalReaction.effect(localReaction, effect);
+	ReactionEffect.actions(effect, action);
+}
+
 // Guardok expression-jeit adja vissza
 pattern guardToExpression(guard : Guard, expression : Expression) {
 	Guard.expression(guard, expression);
 }
-
+/*
 pattern guardWithEventValue(expression : LogicalRelationExpression, name) {
 	Guard.expression(_guard, expression);
 	LogicalRelationExpression.leftOperand(expression, left);
 	FeatureCall.feature(left, feature);
 	EventDefinition.name(feature, name);
-}
-
+}*/
 
 // Returns those right operands that are compared to a typed in-event in a guard
 pattern inEventValues(rightOperand : Expression) {

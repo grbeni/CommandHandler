@@ -56,11 +56,11 @@ import org.yakindu.sct.model.sgraph.State;
 import org.yakindu.sct.model.sgraph.Statechart;
 import org.yakindu.sct.model.sgraph.Transition;
 import org.yakindu.sct.model.sgraph.Vertex;
+import org.yakindu.sct.model.stext.stext.EventRaisingExpression;
 
 import de.uni_paderborn.uppaal.templates.Edge;
 import de.uni_paderborn.uppaal.templates.Location;
 import de.uni_paderborn.uppaal.templates.Synchronization;
-import de.uni_paderborn.uppaal.templates.SynchronizationKind;
 import de.uni_paderborn.uppaal.templates.Template;
 
 /**
@@ -114,7 +114,9 @@ public class CommandHandler extends AbstractHandler {
 	// Szinkronizációs csatornák létrehozására
 	private int syncChanId = 0;
 	// EntryLoc név generálásra
-	private int entryStateId = 0;	
+	private int entryStateId = 0;
+	// For the generation of raising locations
+	private int raiseId = 0;
 
 	@Override
 	public Object execute(ExecutionEvent event) throws ExecutionException {
@@ -312,6 +314,8 @@ public class CommandHandler extends AbstractHandler {
 		
 		// Edge guardok berakása
 		setEdgeGuards();		
+		
+		createLocalReactions();
 		
 		// Template guardok berakása
 		createTemplateValidityGuards();
@@ -866,6 +870,29 @@ public class CommandHandler extends AbstractHandler {
 		}
 	}
 	
+	private void createLocalReactions() throws Exception {	
+		for (LocalReactionValueOfGuardMatch localReactionValueOfGuardMatch : runOnceEngine.getAllMatches(LocalReactionValueOfGuardMatcher.querySpecification())) {
+			Location stateLocation = stateLocationMap.get(localReactionValueOfGuardMatch.getState());
+			Edge localReactionEdge = builder.createEdge(stateLocation.getParentTemplate());
+			builder.setEdgeSource(localReactionEdge, stateLocation);
+			builder.setEdgeTarget(localReactionEdge, stateLocation);
+			String guard = Helper.getInEventValueName(localReactionValueOfGuardMatch.getEventName()) + " == " + UppaalCodeGenerator.transformExpression(localReactionValueOfGuardMatch.getGuardRightOperand());
+			builder.setEdgeGuard(localReactionEdge, guard);
+			builder.setEdgeSync(localReactionEdge, localReactionValueOfGuardMatch.getEventName(), false);
+			for (LocalReactionValueOfEffectMatch localReactionValueOfEffectMatch : runOnceEngine.getAllMatches(LocalReactionValueOfEffectMatcher.querySpecification())) {
+				if (localReactionValueOfEffectMatch.getLocalReaction() == localReactionValueOfGuardMatch.getLocalReaction()) {
+					builder.setEdgeUpdate(localReactionEdge, UppaalCodeGenerator.transformExpression(localReactionValueOfEffectMatch.getAction()));
+					if (localReactionValueOfEffectMatch.getAction() instanceof EventRaisingExpression) {
+						EventRaisingExpression eventRaisingExpression = (EventRaisingExpression) localReactionValueOfEffectMatch.getAction();
+						Edge syncEdge = createSyncLocationWithString(localReactionEdge.getTarget(), "Raise_" + Helper.getInEventValueName(UppaalCodeGenerator.transformExpression(eventRaisingExpression.getEvent())) + (raiseId++), UppaalCodeGenerator.transformExpression(eventRaisingExpression.getEvent()));
+						builder.setEdgeTarget(localReactionEdge, syncEdge.getSource());
+						builder.setEdgeUpdate(localReactionEdge, Helper.getInEventValueName(UppaalCodeGenerator.transformExpression(eventRaisingExpression.getEvent())) + " = " + UppaalCodeGenerator.transformExpression(eventRaisingExpression.getValue()));
+					}
+				}
+			}
+		}
+	}
+	
 	/**
 	 * Ez a metódus létrehozza az UPPAAL edge-eken az guardokat a Yakindu guardok alapján.
 	 * @throws IncQueryException 
@@ -918,13 +945,12 @@ public class CommandHandler extends AbstractHandler {
 		EdgesWithRaisingEventMatcher edgesWithRaisingEventMatcher = engine.getMatcher(EdgesWithRaisingEventQuerySpecification.instance());
 		RaisingExpressionsWithAssignmentMatcher raisingExpressionsWithAssignmentMatcher = engine.getMatcher(RaisingExpressionsWithAssignmentQuerySpecification.instance());
 		Set<String> raisingEvents = new HashSet<String>();
-		int id = 0;
 		for (EdgesWithRaisingEventMatch edgesWithRaisingEventMatch : edgesWithRaisingEventMatcher.getAllMatches()) {
 			if (!raisingEvents.contains(edgesWithRaisingEventMatch.getName())) {
 				builder.addGlobalDeclaration("broadcast chan " + edgesWithRaisingEventMatch.getName() + ";");
 				raisingEvents.add(edgesWithRaisingEventMatch.getName());
 			}
-			Edge raiseEdge = createSyncLocationWithString(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()).getTarget(), "Raise_" + edgesWithRaisingEventMatch.getName() + (id++), edgesWithRaisingEventMatch.getName());
+			Edge raiseEdge = createSyncLocationWithString(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()).getTarget(), "Raise_" + edgesWithRaisingEventMatch.getName() + (raiseId++), edgesWithRaisingEventMatch.getName());
 			builder.setEdgeTarget(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()), raiseEdge.getSource());
 			for (RaisingExpressionsWithAssignmentMatch raisingExpressionsWithAssignmentMatch : raisingExpressionsWithAssignmentMatcher.getAllMatches(edgesWithRaisingEventMatch.getTransition(), edgesWithRaisingEventMatch.getElement(), null, null)) {
 				 builder.setEdgeUpdate(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()), Helper.getInEventValueName(raisingExpressionsWithAssignmentMatch.getName()) + " = " + UppaalCodeGenerator.transformExpression(raisingExpressionsWithAssignmentMatch.getValue()));
