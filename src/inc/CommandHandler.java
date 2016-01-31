@@ -22,6 +22,7 @@ import inc.util.FinalStatesQuerySpecification;
 import inc.util.InEventValuesQuerySpecification;
 import inc.util.InEventsQuerySpecification;
 import inc.util.InValuesQuerySpecification;
+import inc.util.LocalReactionValueOfEffectQuerySpecification;
 import inc.util.RaisingExpressionsWithAssignmentQuerySpecification;
 import inc.util.SourceAndTargetOfTransitionsQuerySpecification;
 import inc.util.StatesQuerySpecification;
@@ -164,6 +165,7 @@ public class CommandHandler extends AbstractHandler {
 									// ID változók resetelése
 									syncChanId = 0;
 									entryStateId = 0;
+									raiseId = 0;
 									
 									// Csak akkor szennyezzük az Uppaal modellt end változóval, ha van final state a Yakindu modellben
 									if (Helper.hasFinalState()) {
@@ -878,24 +880,25 @@ public class CommandHandler extends AbstractHandler {
 	 * @throws Exception
 	 */
 	private void createLocalReactions() throws Exception {
+		LocalReactionValueOfEffectMatcher localReactionValueOfEffectMatcher = engine.getMatcher(LocalReactionValueOfEffectQuerySpecification.instance());
 		for (LocalReactionValueOfGuardMatch localReactionValueOfGuardMatch : runOnceEngine.getAllMatches(LocalReactionValueOfGuardMatcher.querySpecification())) {
 			Location stateLocation = stateLocationMap.get(localReactionValueOfGuardMatch.getState());
 			Edge localReactionEdge = builder.createEdge(stateLocation.getParentTemplate());
 			builder.setEdgeSource(localReactionEdge, stateLocation);
 			builder.setEdgeTarget(localReactionEdge, stateLocation);
-			String guard = Helper.getInEventValueName(localReactionValueOfGuardMatch.getEventName()) + " "+ localReactionValueOfGuardMatch.getOperator().getLiteral() + " " + UppaalCodeGenerator.transformExpression(localReactionValueOfGuardMatch.getGuardRightOperand());
+			String guard = Helper.getInEventValueName(localReactionValueOfGuardMatch.getEventName()) + " " + localReactionValueOfGuardMatch.getOperator().getLiteral() + " " + UppaalCodeGenerator.transformExpression(localReactionValueOfGuardMatch.getGuardRightOperand());
 			builder.setEdgeGuard(localReactionEdge, guard);
 			builder.setEdgeSync(localReactionEdge, localReactionValueOfGuardMatch.getEventName(), false);
-			for (LocalReactionValueOfEffectMatch localReactionValueOfEffectMatch : runOnceEngine.getAllMatches(LocalReactionValueOfEffectMatcher.querySpecification())) {
-				if (localReactionValueOfEffectMatch.getLocalReaction() == localReactionValueOfGuardMatch.getLocalReaction()) {
+			for (LocalReactionValueOfEffectMatch localReactionValueOfEffectMatch : localReactionValueOfEffectMatcher.getAllMatches(localReactionValueOfGuardMatch.getLocalReaction(), null)) {
+				//if (localReactionValueOfEffectMatch.getLocalReaction() == localReactionValueOfGuardMatch.getLocalReaction()) {
 					builder.setEdgeUpdate(localReactionEdge, UppaalCodeGenerator.transformExpression(localReactionValueOfEffectMatch.getAction()));
 					if (localReactionValueOfEffectMatch.getAction() instanceof EventRaisingExpression) {
 						EventRaisingExpression eventRaisingExpression = (EventRaisingExpression) localReactionValueOfEffectMatch.getAction();
-						Edge syncEdge = createSyncLocationWithString(localReactionEdge.getTarget(), "Raise_" + Helper.getInEventValueName(UppaalCodeGenerator.transformExpression(eventRaisingExpression.getEvent())) + (raiseId++), UppaalCodeGenerator.transformExpression(eventRaisingExpression.getEvent()));
+						Edge syncEdge = createSyncLocationWithString(localReactionEdge.getTarget(), "Raise_" + UppaalCodeGenerator.transformExpression(eventRaisingExpression.getEvent()) + (raiseId++), UppaalCodeGenerator.transformExpression(eventRaisingExpression.getEvent()));
 						builder.setEdgeTarget(localReactionEdge, syncEdge.getSource());
 						builder.setEdgeUpdate(localReactionEdge, Helper.getInEventValueName(UppaalCodeGenerator.transformExpression(eventRaisingExpression.getEvent())) + " = " + UppaalCodeGenerator.transformExpression(eventRaisingExpression.getValue()));
 					}
-				}
+				//}
 			}
 		}
 	}
