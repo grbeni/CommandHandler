@@ -155,7 +155,7 @@ pattern events(eventName) {
 	EventDefinition.name(_event, eventName);
 }
 
-pattern localReactionWithGuard(state, localReaction, guardLeftOperand, guardRightOperand, operator) {
+pattern localReactionWithGuard(state : State, localReaction : LocalReaction, guardLeftOperand : Expression, guardRightOperand : Expression, operator) {
 	State.localReactions(state, localReaction);
 	LocalReaction.trigger(localReaction, trigger);
 	ReactionTrigger.guard(trigger, guard);
@@ -171,25 +171,13 @@ pattern localReactionValueOfGuard(state : State, localReaction : LocalReaction, 
 	FeatureCall.feature(value, feature);
 	EventDefinition.name(feature, name);
 } or {
-	State.localReactions(state, localReaction);
-	LocalReaction.trigger(localReaction, trigger);
-	ReactionTrigger.guard(trigger, guard);
-	Guard.expression(guard, expression);
-	LogicalRelationExpression.leftOperand(expression, left);
-	FeatureCall.feature(left, feature);
+	find localReactionWithGuard(state, localReaction, guardLeftOperand, guardRightOperand, operator);
+	FeatureCall.feature(guardLeftOperand, feature);
 	VariableDefinition.name(feature, name);
-	LogicalRelationExpression.rightOperand(expression, guardRightOperand);	
-	LogicalRelationExpression.operator(expression, operator);	
 } or {
-	State.localReactions(state, localReaction);
-	LocalReaction.trigger(localReaction, trigger);
-	ReactionTrigger.guard(trigger, guard);
-	Guard.expression(guard, expression);
-	LogicalRelationExpression.leftOperand(expression, left);
-	ElementReferenceExpression.reference(left, reference);
-	VariableDefinition.name(reference, name);
-	LogicalRelationExpression.rightOperand(expression, guardRightOperand);	
-	LogicalRelationExpression.operator(expression, operator);	
+	find localReactionWithGuard(state, localReaction, guardLeftOperand, guardRightOperand, operator);
+	ElementReferenceExpression.reference(guardLeftOperand, reference);
+	VariableDefinition.name(reference, name);	
 }
 
 pattern localReactionValueOfEffect(localReaction : LocalReaction, action : Expression) {
