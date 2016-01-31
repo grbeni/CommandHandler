@@ -3,6 +3,7 @@ package inc;
 import inc.util.ChoicesQuerySpecification;
 import inc.util.CompositeStatesQuerySpecification;
 import inc.util.EntryOfRegionsQuerySpecification;
+import inc.util.EventsQuerySpecification;
 import inc.util.FinalStatesQuerySpecification;
 import inc.util.RegionsOfCompositeStatesQuerySpecification;
 import inc.util.StatesQuerySpecification;
@@ -270,6 +271,14 @@ public class Helper {
 		else {
 			return  (region.getName() + "Of" + ((State)region.getComposite()).getName()).replaceAll(" ", "");
 		}
+	}
+	
+	public static boolean isEventName(String name) throws IncQueryException {
+		EventsMatcher eventsMatcher = engine.getMatcher(EventsQuerySpecification.instance());
+		for (@SuppressWarnings("unused") EventsMatch eventsMatch : eventsMatcher.getAllMatches(name)) {
+			return true;
+		}
+		return false;
 	}
 	
 	public static String getInEventValueName(String eventName) throws IncQueryException {

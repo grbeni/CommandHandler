@@ -155,17 +155,41 @@ pattern events(eventName) {
 	EventDefinition.name(_event, eventName);
 }
 
-pattern localReactionValueOfGuard(state : State, localReaction : LocalReaction, guardRightOperand : Expression, eventName, operator) {		
+pattern localReactionWithGuard(state, localReaction, guardLeftOperand, guardRightOperand, operator) {
+	State.localReactions(state, localReaction);
+	LocalReaction.trigger(localReaction, trigger);
+	ReactionTrigger.guard(trigger, guard);
+	Guard.expression(guard, expression);
+	LogicalRelationExpression.leftOperand(expression, guardLeftOperand);
+	LogicalRelationExpression.rightOperand(expression, guardRightOperand);	
+	LogicalRelationExpression.operator(expression, operator);
+}
+
+pattern localReactionValueOfGuard(state : State, localReaction : LocalReaction, guardRightOperand : Expression, name, operator) {		
+	find localReactionWithGuard(state, localReaction, guardLeftOperand, guardRightOperand, operator);
+	EventValueReferenceExpression.value(guardLeftOperand, value);
+	FeatureCall.feature(value, feature);
+	EventDefinition.name(feature, name);
+} or {
 	State.localReactions(state, localReaction);
 	LocalReaction.trigger(localReaction, trigger);
 	ReactionTrigger.guard(trigger, guard);
 	Guard.expression(guard, expression);
 	LogicalRelationExpression.leftOperand(expression, left);
-	EventValueReferenceExpression.value(left, value);
-	FeatureCall.feature(value, feature);
-	EventDefinition.name(feature, eventName);
+	FeatureCall.feature(left, feature);
+	VariableDefinition.name(feature, name);
 	LogicalRelationExpression.rightOperand(expression, guardRightOperand);	
-	LogicalRelationExpression.operator(expression, operator);
+	LogicalRelationExpression.operator(expression, operator);	
+} or {
+	State.localReactions(state, localReaction);
+	LocalReaction.trigger(localReaction, trigger);
+	ReactionTrigger.guard(trigger, guard);
+	Guard.expression(guard, expression);
+	LogicalRelationExpression.leftOperand(expression, left);
+	ElementReferenceExpression.reference(left, reference);
+	VariableDefinition.name(reference, name);
+	LogicalRelationExpression.rightOperand(expression, guardRightOperand);	
+	LogicalRelationExpression.operator(expression, operator);	
 }
 
 pattern localReactionValueOfEffect(localReaction : LocalReaction, action : Expression) {
