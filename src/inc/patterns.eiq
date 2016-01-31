@@ -166,6 +166,10 @@ pattern statesWithExitEventWithoutOutgoingTransition(state : State, expression :
 	find reactionEffectToExpression(effect, expression);
 }
 
+pattern events(eventName) {
+	EventDefinition.name(event, eventName);
+}
+
 pattern localReactionValueOfGuard(state : State, localReaction : LocalReaction, guardRightOperand : Expression, eventName) {		
 	State.localReactions(state, localReaction);
 	LocalReaction.trigger(localReaction, trigger);

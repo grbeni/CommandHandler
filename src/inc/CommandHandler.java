@@ -13,6 +13,7 @@ import inc.util.EdgesWithGuardQuerySpecification;
 import inc.util.EdgesWithRaisingEventQuerySpecification;
 import inc.util.EdgesWithTimeTriggerQuerySpecification;
 import inc.util.EntryOfRegionsQuerySpecification;
+import inc.util.EventsQuerySpecification;
 import inc.util.EventsWithTypeQuerySpecification;
 import inc.util.ExitNodeSyncQuerySpecification;
 import inc.util.ExitNodesQuerySpecification;
@@ -314,6 +315,8 @@ public class CommandHandler extends AbstractHandler {
 		
 		// Edge guardok berakása
 		setEdgeGuards();		
+		
+		createEvents();
 		
 		createLocalReactions();
 		
@@ -938,18 +941,24 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
+	 * Creates events as synchronization channels.
+	 * @throws IncQueryException
+	 */
+	private void createEvents() throws IncQueryException {
+		EventsMatcher eventsMatcher = engine.getMatcher(EventsQuerySpecification.instance());
+		for (EventsMatch eventsMatch : eventsMatcher.getAllMatches()) {
+			builder.addGlobalDeclaration("broadcast chan " + eventsMatch.getEventName() + ";");
+		}
+	}
+	
+	/**
 	 * Ez a metódus felel az event raising megvalósításáért.
 	 * @throws Exception jelzi, ha nem mûködik a szinkronizáció. (Nem tökéletes még ez a kód.)
 	 */
 	private void createRaisingEventSyncs() throws Exception {
 		EdgesWithRaisingEventMatcher edgesWithRaisingEventMatcher = engine.getMatcher(EdgesWithRaisingEventQuerySpecification.instance());
 		RaisingExpressionsWithAssignmentMatcher raisingExpressionsWithAssignmentMatcher = engine.getMatcher(RaisingExpressionsWithAssignmentQuerySpecification.instance());
-		Set<String> raisingEvents = new HashSet<String>();
 		for (EdgesWithRaisingEventMatch edgesWithRaisingEventMatch : edgesWithRaisingEventMatcher.getAllMatches()) {
-			if (!raisingEvents.contains(edgesWithRaisingEventMatch.getName())) {
-				builder.addGlobalDeclaration("broadcast chan " + edgesWithRaisingEventMatch.getName() + ";");
-				raisingEvents.add(edgesWithRaisingEventMatch.getName());
-			}
 			Edge raiseEdge = createSyncLocationWithString(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()).getTarget(), "Raise_" + edgesWithRaisingEventMatch.getName() + (raiseId++), edgesWithRaisingEventMatch.getName());
 			builder.setEdgeTarget(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()), raiseEdge.getSource());
 			for (RaisingExpressionsWithAssignmentMatch raisingExpressionsWithAssignmentMatch : raisingExpressionsWithAssignmentMatcher.getAllMatches(edgesWithRaisingEventMatch.getTransition(), edgesWithRaisingEventMatch.getElement(), null, null)) {
@@ -1017,7 +1026,6 @@ public class CommandHandler extends AbstractHandler {
 		}
 		
 		for (InEventsMatch inEventsMatch : inEventsMatcher.getAllMatches()) {
-			builder.addGlobalDeclaration("broadcast chan " + inEventsMatch.getName() + ";");
 			Edge ownTriggerEdge = builder.createEdge(controlTemplate);
 			builder.setEdgeSource(ownTriggerEdge, controlLocation);
 			builder.setEdgeTarget(ownTriggerEdge, controlLocation);
@@ -1054,9 +1062,6 @@ public class CommandHandler extends AbstractHandler {
 			}
 			// If the mapped edge already has a sync, we have to create a syncing location
 			if (transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization() != null) {
-				/*if (transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization().getKind() == SynchronizationKind.SEND) {
-					throw new Exception(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSource().getName() + "->" + transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getTarget().getName() + " already has a ! sync.");
-				}*/
 				Edge syncEdge = createSyncLocation(builder.getEdgeTarget(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition())), "triggerLocation" + (++id), transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization());
 				builder.setEdgeTarget(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), builder.getEdgeSource(syncEdge));
 				builder.setEdgeSync(transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), triggerOfTransitionMatch.getTriggerName(), false);
