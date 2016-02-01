@@ -523,7 +523,10 @@ public class CommandHandler extends AbstractHandler {
 			Edge entryEdge = hasEntryLoc.get(compositeStateMatch.getCompositeState());
 			builder.setEdgeSync(entryEdge, syncChanVar + (syncChanId), true);
 			// Minden eggyel alatti régióban létrehozzuk a szükséges ? sync-eket
-			setAllRegionsWithSync(true, true, compositeStateMatch.getCompositeState().getRegions());
+			setAllRegionsWithSync(true, compositeStateMatch.getCompositeState().getRegions());
+			for (Region subregion : compositeStateMatch.getCompositeState().getRegions()) {
+				generateNewInitLocation(subregion);
+			}
 		}
 	}
 	
@@ -537,51 +540,37 @@ public class CommandHandler extends AbstractHandler {
 		// Lekérjük a composite állapotokat
 		CompositeStatesMatcher compositeStatesMatcher = engine.getMatcher(CompositeStatesQuerySpecification.instance());
 		SourceAndTargetOfTransitionsMatcher sourceAndTargetOfTransitionsMatcher = engine.getMatcher(SourceAndTargetOfTransitionsQuerySpecification.instance());
-		Collection<CompositeStatesMatch> allCompositeStatesMatches = compositeStatesMatcher.getAllMatches();
 		// Megnézzük az összes compositeState matchet
-		for (CompositeStatesMatch compositeStateMatch : allCompositeStatesMatches) {
+		for (CompositeStatesMatch compositeStateMatch : compositeStatesMatcher.getAllMatches()) {
 			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
 			// Minden kimenõ élre ráírjuk a kilépési sync-et
-			for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : sourceAndTargetOfTransitionsMatcher.getAllMatches()) {
-				if (sourceAndTargetOfTransitionsMatch.getSource() == compositeStateMatch.getCompositeState()) {
-					if (transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()).getSynchronization() == null) {
-						builder.setEdgeSync(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), syncChanVar + (syncChanId), true);
-					}
-					else {
-						Edge syncEdge = createSyncLocation(stateLocationMap.get(sourceAndTargetOfTransitionsMatch.getTarget()), "CompositeSyncLocation" + (++id), null);
-						builder.setEdgeSync(syncEdge, syncChanVar + (syncChanId), true);
-						builder.setEdgeTarget(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), builder.getEdgeSource(syncEdge));
-					}
+			for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : sourceAndTargetOfTransitionsMatcher.getAllMatches(null, compositeStateMatch.getCompositeState(), null)) {				
+				if (transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()).getSynchronization() == null) {
+					builder.setEdgeSync(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), syncChanVar + (syncChanId), true);
 				}
+				else {
+					Edge syncEdge = createSyncLocation(stateLocationMap.get(sourceAndTargetOfTransitionsMatch.getTarget()), "CompositeSyncLocation" + (++id), null);
+					builder.setEdgeSync(syncEdge, syncChanVar + (syncChanId), true);
+					builder.setEdgeTarget(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), builder.getEdgeSource(syncEdge));
+				}				
 			}
 			// Letiltjuk az összes alatta lévõ region-t
 			List<Region> subregionList = new ArrayList<Region>();
 			Helper.addAllSubregionsToRegionList(compositeStateMatch.getCompositeState(), subregionList);
-			setAllRegionsWithSync(false, false, subregionList);			
+			setAllRegionsWithSync(false, subregionList);			
 		}
 	}
 	
 	/**
 	 * Minden megadott régióban létrehozza a ? szinkronizációs csatornákat, és azokon az érvényességi változók updatejeit. Illetve egy initLocation-t, ha elõször építjük fel a template-et.
 	 * Ezek a csatornák vagy önmagukba vagy az region entrybe vezetnek.
-	 * @param toBeTrue Engedélyezni vagy tiltani szeretnénk-e a régiókat.
 	 * @param needInit Kell-e initLocation a template-be.
 	 * @param regionList Yakindu regionök listája, amelyeken létre szeretnénk hozni a ? csatornákat az update-ekkel.
 	 * @throws IncQueryException 
 	 */
-	private void setAllRegionsWithSync(boolean toBeTrue, boolean needInit, List<Region> regionList) throws IncQueryException {
+	private void setAllRegionsWithSync(boolean toBeTrue, List<Region> regionList) throws IncQueryException {
 		VerticesOfRegionsMatcher verticesOfRegionsMatcher = engine.getMatcher(VerticesOfRegionsQuerySpecification.instance());
-		for (Region subregion : regionList) {
-			if (needInit) {
-				Location initLocation = builder.createLocation("GeneratedInit", regionTemplateMap.get(subregion));
-				Edge syncEdge = builder.createEdge(regionTemplateMap.get(subregion));
-				builder.setEdgeSync(syncEdge, syncChanVar + syncChanId, false);
-				builder.setEdgeUpdate(syncEdge, isActiveVar + " = " + ((toBeTrue) ? "true" : "false"));
-				builder.setEdgeSource(syncEdge, initLocation);
-				builder.setEdgeTarget(syncEdge, stateLocationMap.get(Helper.getEntryOfRegion(subregion)));
-				builder.setInitialLocation(initLocation, regionTemplateMap.get(subregion));
-				hasInitLoc.put(regionTemplateMap.get(subregion), initLocation);
-			}			
+		for (Region subregion : regionList) {	
 			for (VerticesOfRegionsMatch verticesOfRegionMatch : verticesOfRegionsMatcher.getAllMatches()) {
 				// Az adott subregion vertexeit vizsgáljuk
 				if (verticesOfRegionMatch.getRegion() == subregion) {
@@ -613,6 +602,22 @@ public class CommandHandler extends AbstractHandler {
 				}
 			}
 		}
+	}
+	
+	/**
+	 * This method creates a init location int the mapped region (in the template equivalent) and ties it to the entry of the region.
+	 * @param region The region whose template equivalent will get the generated init location
+	 * @throws IncQueryException
+	 */
+	private void generateNewInitLocation(Region region) throws IncQueryException {
+		Location initLocation = builder.createLocation("GeneratedInit", regionTemplateMap.get(region));
+		Edge syncEdge = builder.createEdge(regionTemplateMap.get(region));
+		builder.setEdgeSync(syncEdge, syncChanVar + syncChanId, false);
+		builder.setEdgeUpdate(syncEdge, isActiveVar + " = true");
+		builder.setEdgeSource(syncEdge, initLocation);
+		builder.setEdgeTarget(syncEdge, stateLocationMap.get(Helper.getEntryOfRegion(region)));
+		builder.setInitialLocation(initLocation, regionTemplateMap.get(region));
+		hasInitLoc.put(regionTemplateMap.get(region), initLocation);
 	}
 	
 	/**
@@ -680,7 +685,7 @@ public class CommandHandler extends AbstractHandler {
 			if (Helper.isCompositeState(target)) {
 				List<Region> pickedSubregions = new ArrayList<Region>(((State) target).getRegions()); // Talán addAll kéne?
 				pickedSubregions.removeAll(visitedRegions);
-				setAllRegionsWithSync(true, false, pickedSubregions);				
+				setAllRegionsWithSync(true, pickedSubregions);				
 			}
 		}	
 		// Ha nem a legfölsõ szinten vagyunk, akkor létrehozzuk a ? szinkronizációs éleket minden állapotból a megfelelõ állapotba
@@ -730,7 +735,7 @@ public class CommandHandler extends AbstractHandler {
 			if (Helper.isCompositeState(target)) {
 				List<Region> pickedSubregions = new ArrayList<Region>(((State) target).getRegions()); // Talán addAll kéne?
 				pickedSubregions.removeAll(visitedRegions);
-				setAllRegionsWithSync(true, false, pickedSubregions);				
+				setAllRegionsWithSync(true, pickedSubregions);				
 			}
 		}		
 	}
@@ -784,7 +789,7 @@ public class CommandHandler extends AbstractHandler {
 			State sourceState = (State) source;
 			Helper.addAllSubregionsToRegionList(sourceState, subregionList);
 			subregionList.removeAll(visitedRegions);
-			setAllRegionsWithSync(false, false, subregionList);
+			setAllRegionsWithSync(false, subregionList);
 			return;
 		}
 		// Közbülsõ szinteken csak kézzel létrehozzuk a sync éleket, letiltjuk a régiót, és rájuk írjuk az exit expressiont, ha van
