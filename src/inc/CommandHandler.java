@@ -571,33 +571,30 @@ public class CommandHandler extends AbstractHandler {
 	private void setAllRegionsWithSync(boolean toBeTrue, List<Region> regionList) throws IncQueryException {
 		VerticesOfRegionsMatcher verticesOfRegionsMatcher = engine.getMatcher(VerticesOfRegionsQuerySpecification.instance());
 		for (Region subregion : regionList) {	
-			for (VerticesOfRegionsMatch verticesOfRegionMatch : verticesOfRegionsMatcher.getAllMatches()) {
-				// Az adott subregion vertexeit vizsgáljuk
-				if (verticesOfRegionMatch.getRegion() == subregion) {
-					// Choice-okból nem csinálunk magukba éleket, azokban elvileg nem tartózkodhatunk
-					if (!(Helper.isChoice(verticesOfRegionMatch.getVertex())) && !(Helper.isEntry(verticesOfRegionMatch.getVertex()))) {
-						Edge syncEdge = builder.createEdge(regionTemplateMap.get(subregion));
-						builder.setEdgeSync(syncEdge, syncChanVar + syncChanId, false);
-						builder.setEdgeUpdate(syncEdge, isActiveVar + " = " + ((toBeTrue) ? "true" : "false"));
-						builder.setEdgeSource(syncEdge, stateLocationMap.get(verticesOfRegionMatch.getVertex()));
-						// Ha belépésre engedélyezzük a régiót, akkor vizsgálni kell, hogy hova kössük a szinkornizációs él végpontját
-						if (toBeTrue) {
-							if (Helper.hasHistory(subregion)) {
-								if (hasEntryLoc.containsKey(verticesOfRegionMatch.getVertex())) {
-									builder.setEdgeTarget(syncEdge, hasEntryLoc.get(verticesOfRegionMatch.getVertex()).getSource());
-								}
-								else {
-									builder.setEdgeTarget(syncEdge, stateLocationMap.get(verticesOfRegionMatch.getVertex()));
-								}
+			for (VerticesOfRegionsMatch verticesOfRegionMatch : verticesOfRegionsMatcher.getAllMatches(subregion, null)) {
+				// Choice-okból nem csinálunk magukba éleket, azokban elvileg nem tartózkodhatunk
+				if (!(Helper.isChoice(verticesOfRegionMatch.getVertex())) && !(Helper.isEntry(verticesOfRegionMatch.getVertex()))) {
+					Edge syncEdge = builder.createEdge(regionTemplateMap.get(subregion));
+					builder.setEdgeSync(syncEdge, syncChanVar + syncChanId, false);
+					builder.setEdgeUpdate(syncEdge, isActiveVar + " = " + ((toBeTrue) ? "true" : "false"));
+					builder.setEdgeSource(syncEdge, stateLocationMap.get(verticesOfRegionMatch.getVertex()));
+					// Ha belépésre engedélyezzük a régiót, akkor vizsgálni kell, hogy hova kössük a szinkornizációs él végpontját
+					if (toBeTrue) {
+						if (Helper.hasHistory(subregion)) {
+							if (hasEntryLoc.containsKey(verticesOfRegionMatch.getVertex())) {
+								builder.setEdgeTarget(syncEdge, hasEntryLoc.get(verticesOfRegionMatch.getVertex()).getSource());
 							}
 							else {
-								builder.setEdgeTarget(syncEdge, stateLocationMap.get(Helper.getEntryOfRegion(subregion)));
+								builder.setEdgeTarget(syncEdge, stateLocationMap.get(verticesOfRegionMatch.getVertex()));
 							}
 						}
-						// Kilépéskor nem vizsgálhatjuk, hogy van-e history pl.: entryLoc-ja van valamelyik composite state-nek és az committed
 						else {
-							builder.setEdgeTarget(syncEdge, stateLocationMap.get(verticesOfRegionMatch.getVertex()));
+							builder.setEdgeTarget(syncEdge, stateLocationMap.get(Helper.getEntryOfRegion(subregion)));
 						}
+					}
+					// Kilépéskor nem vizsgálhatjuk, hogy van-e history pl.: entryLoc-ja van valamelyik composite state-nek és az committed
+					else {
+						builder.setEdgeTarget(syncEdge, stateLocationMap.get(verticesOfRegionMatch.getVertex()));
 					}
 				}
 			}
@@ -622,27 +619,27 @@ public class CommandHandler extends AbstractHandler {
 	
 	/**
 	 * Létrehozza azokat az éleket, amelyeknek végpontjai nem ugyanazon regionben találhatók.
-	 * @throws IncQueryException
+	 * @throws Exception 
 	 */
-	private void createEdgesForDifferentAbstraction() throws IncQueryException {
+	private void createEdgesForDifferentAbstraction() throws Exception {
 		//Lekérjük a transition match-eket		
 		EdgesAcrossRegionsMatcher edgesAcrossRegionsMatcher = engine.getMatcher(EdgesAcrossRegionsQuerySpecification.instance());
-		Collection<EdgesAcrossRegionsMatch> allAcrossTransitionMatches = edgesAcrossRegionsMatcher.getAllMatches();	
 		// Megnézzük a transition match-eket és létrehozzuk az edge-eket a megfelelõ guardokkal és effectekkel
-		for (EdgesAcrossRegionsMatch acrossTransitionMatch : allAcrossTransitionMatches) {											
+		for (EdgesAcrossRegionsMatch acrossTransitionMatch : edgesAcrossRegionsMatcher.getAllMatches()) {											
 			// Ha a két végpont nem azonos region-ben van:
 			// Megnézzük melyik milyen szintû, és aszerint hozzuk létre a szinkronizációs csatornákat
-			if (stateLocationMap.containsKey(acrossTransitionMatch.getSource()) && stateLocationMap.containsKey(acrossTransitionMatch.getTarget())) {								
-				int sourceLevel = Helper.getLevelOfVertex(acrossTransitionMatch.getSource());
-				int targetLevel = Helper.getLevelOfVertex(acrossTransitionMatch.getTarget());
-				if (sourceLevel < targetLevel) {
-					createEdgesWhenSourceLesser(acrossTransitionMatch.getSource(), acrossTransitionMatch.getTarget(), acrossTransitionMatch.getTransition(), targetLevel, targetLevel - sourceLevel, new ArrayList<Region>());							
-				}						
-				if (sourceLevel > targetLevel) {
-					createEdgesWhenSourceGreater(acrossTransitionMatch.getSource(), acrossTransitionMatch.getTarget(), acrossTransitionMatch.getTransition(), sourceLevel, new ArrayList<Region>());
-				}
-			}				
-		}
+			if (!(stateLocationMap.containsKey(acrossTransitionMatch.getSource()) && stateLocationMap.containsKey(acrossTransitionMatch.getTarget()))) {								
+				throw new Exception("The target or the source is not mapped: " + acrossTransitionMatch.getSource() + " " + stateLocationMap.containsKey(acrossTransitionMatch.getTarget()));				
+			}
+			int sourceLevel = Helper.getLevelOfVertex(acrossTransitionMatch.getSource());
+			int targetLevel = Helper.getLevelOfVertex(acrossTransitionMatch.getTarget());
+			if (sourceLevel < targetLevel) {
+				createEdgesWhenSourceLesser(acrossTransitionMatch.getSource(), acrossTransitionMatch.getTarget(), acrossTransitionMatch.getTransition(), targetLevel, targetLevel - sourceLevel, new ArrayList<Region>());							
+			}						
+			if (sourceLevel > targetLevel) {
+				createEdgesWhenSourceGreater(acrossTransitionMatch.getSource(), acrossTransitionMatch.getTarget(), acrossTransitionMatch.getTransition(), sourceLevel, new ArrayList<Region>());
+			}
+		}		
 	}
 	
 	/**
