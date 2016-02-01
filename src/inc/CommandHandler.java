@@ -220,7 +220,7 @@ public class CommandHandler extends AbstractHandler {
 		// Lekérjük a változó definiciókat
 		VariableDefinitionsMatcher variableDefinitionsMatcher = engine.getMatcher(VariableDefinitionsQuerySpecification.instance());
 		Collection<VariableDefinitionsMatch> allVariableDefinitions = variableDefinitionsMatcher.getAllMatches();
-		System.out.println("A változók száma: " + allVariableDefinitions.size());
+		System.out.println("Number of variables: " + allVariableDefinitions.size());
 		for (VariableDefinitionsMatch variableMatch : allVariableDefinitions) {
 			StringBuilder expression = new StringBuilder();
 			if (variableMatch.getIsReadonly()) {
@@ -319,8 +319,10 @@ public class CommandHandler extends AbstractHandler {
 		// Edge guardok berakása
 		setEdgeGuards();		
 		
+		// Create events as broadcast channels
 		createEvents();
 		
+		// Create loop edges + raising locations as local reactions
 		createLocalReactions();
 		
 		// Template guardok berakása
@@ -342,19 +344,16 @@ public class CommandHandler extends AbstractHandler {
 	private void createLocationsFromStates(Region region, Template template) throws IncQueryException {
 		// Lekérjük az állapotokat
 		StatesMatcher statesMatcher = engine.getMatcher(StatesQuerySpecification.instance());
-		Collection<StatesMatch> allStateMatches = statesMatcher.getAllMatches();
 		// Megnézzük a state matcheket és létrehozzuk a location-öket
-		for (StatesMatch stateMatch : allStateMatches) {				
-			if (stateMatch.getParentRegion() == region) {										
-				Location aLocation = builder.createLocation(stateMatch.getName(), template);
-				stateLocationMap.put(stateMatch.getState(), aLocation); // A state-location párokat betesszük a map-be	
-				if (Helper.isCompositeState(stateMatch.getState())) {
-					builder.setLocationComment(aLocation, "Composite state");
-				}
-				else {
-					builder.setLocationComment(aLocation, "Simple state");
-				}
-			}									
+		for (StatesMatch stateMatch : statesMatcher.getAllMatches(null, region, null)) {												
+			Location aLocation = builder.createLocation(stateMatch.getName(), template);
+			stateLocationMap.put(stateMatch.getState(), aLocation); // A state-location párokat betesszük a map-be	
+			if (Helper.isCompositeState(stateMatch.getState())) {
+				builder.setLocationComment(aLocation, "Composite state");
+			}
+			else {
+				builder.setLocationComment(aLocation, "Simple state");
+			}												
 		}
 	}
 	
@@ -369,15 +368,12 @@ public class CommandHandler extends AbstractHandler {
 		int id = 0; 
 		// Lekérjük a choice-okat
 		ChoicesMatcher choicesMatcher = engine.getMatcher(ChoicesQuerySpecification.instance());
-		Collection<ChoicesMatch> allChoices = choicesMatcher.getAllMatches();
-		// Megnézzük a state matcheket és létrehozzuk a location-öket		
-		for (ChoicesMatch choiceMatch : allChoices) {
-			if (choiceMatch.getRegion() == region) {										
-				Location aLocation = builder.createLocation("Choice" + id++, template);
-				builder.setLocationCommitted(aLocation);
-				stateLocationMap.put(choiceMatch.getChoice(), aLocation); // A choice-location párokat betesszük a map-be	
-				builder.setLocationComment(aLocation, "A choice");
-			}
+		// Megnézzük a choice matcheket és létrehozzuk a location-öket		
+		for (ChoicesMatch choiceMatch : choicesMatcher.getAllMatches(null, region)) {				
+			Location aLocation = builder.createLocation("Choice" + id++, template);
+			builder.setLocationCommitted(aLocation);
+			stateLocationMap.put(choiceMatch.getChoice(), aLocation); // A choice-location párokat betesszük a map-be	
+			builder.setLocationComment(aLocation, "A choice");
 		}
 	}
 	
@@ -392,14 +388,11 @@ public class CommandHandler extends AbstractHandler {
 		int id = 0; 
 		// Lekérjük a final state-eket
 		FinalStatesMatcher finalStatesMatcher = engine.getMatcher(FinalStatesQuerySpecification.instance());
-		Collection<FinalStatesMatch> allFinalStates = finalStatesMatcher.getAllMatches();
 		// Megnézzük a state matcheket és létrehozzuk a location-öket		
-		for (FinalStatesMatch finalStateMatch : allFinalStates) {					
-			if (finalStateMatch.getRegion() == region) {										
-				Location aLocation = builder.createLocation("FinalState" + id++, template);
-				stateLocationMap.put(finalStateMatch.getFinalState(), aLocation); // A final state-location párokat betesszük a map-be	
-				builder.setLocationComment(aLocation, "A final state");
-			}
+		for (FinalStatesMatch finalStateMatch : finalStatesMatcher.getAllMatches(null, region)) {										
+			Location aLocation = builder.createLocation("FinalState" + id++, template);
+			stateLocationMap.put(finalStateMatch.getFinalState(), aLocation); // A final state-location párokat betesszük a map-be	
+			builder.setLocationComment(aLocation, "A final state");
 		}
 	}
 	
@@ -425,15 +418,12 @@ public class CommandHandler extends AbstractHandler {
 		int id = 0; 
 		// Lekérjük a exit node-okat
 		ExitNodesMatcher exitNodesMatcher = engine.getMatcher(ExitNodesQuerySpecification.instance());
-		Collection<ExitNodesMatch> allExitNodes = exitNodesMatcher.getAllMatches();
 		// Megnézzük a state matcheket és létrehozzuk a location-öket		
-		for (ExitNodesMatch exitNodesMatch : allExitNodes) {						
-			if (exitNodesMatch.getRegion() == region) {
-				// Létrehozunk egy új locationt
-				Location exitNode = builder.createLocation("ExitNode" + (id++), template);
-				stateLocationMap.put(exitNodesMatch.getExit(), exitNode); // Az exit node-location párokat betesszük a map-be	
-				builder.setLocationComment(exitNode, "An exit node");
-			}
+		for (ExitNodesMatch exitNodesMatch : exitNodesMatcher.getAllMatches(null, region)) {
+			// Létrehozunk egy új locationt
+			Location exitNode = builder.createLocation("ExitNode" + (id++), template);
+			stateLocationMap.put(exitNodesMatch.getExit(), exitNode); // Az exit node-location párokat betesszük a map-be	
+			builder.setLocationComment(exitNode, "An exit node");
 		}
 	}
 	
@@ -444,8 +434,7 @@ public class CommandHandler extends AbstractHandler {
 	private void createUpdatesForExitNodes() throws IncQueryException {
 		// Lekérjük az exit node-okat
 		ExitNodeSyncMatcher exitNodeSyncMatcher = engine.getMatcher(ExitNodeSyncQuerySpecification.instance());
-		Collection<ExitNodeSyncMatch> allExitNodes = exitNodeSyncMatcher.getAllMatches();
-		for (ExitNodeSyncMatch exitNodesMatch : allExitNodes) {
+		for (ExitNodeSyncMatch exitNodesMatch : exitNodeSyncMatcher.getAllMatches()) {
 			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
 			Edge exitNodeEdge = transitionEdgeMap.get(exitNodesMatch.getExitNodeTransition());
 			builder.setEdgeSync(exitNodeEdge, syncChanVar + (syncChanId), true);
@@ -458,48 +447,46 @@ public class CommandHandler extends AbstractHandler {
 	 * Ez a metódus létrehozza az UPPAAL edge-eket az azonos regionbeli Yakindu transition-ök alapján az EdgesInSameRegionMatcheket felhasználva.
 	 * @param region A Yakindu region, amelybõl a transitionök valók.
 	 * @param template Az UPPAAL template, amelybe az edgeket kell rakni.
-	 * @throws IncQueryException
+	 * @throws Exception 
 	 */
-	private void createEdges(Region region, Template template) throws IncQueryException {
+	private void createEdges(Region region, Template template) throws Exception {
 		//Lekérjük a transition match-eket	
 		EdgesInSameRegionMatcher edgesInSameRegionMatcher = engine.getMatcher(EdgesInSameRegionQuerySpecification.instance());
-		Collection<EdgesInSameRegionMatch> edgesInSameRegionMatches = edgesInSameRegionMatcher.getAllMatches();	
 		// Megnézzük a transition match-eket és létrehozzuk az edge-eket a megfelelõ guardokkal és effectekkel
-		for (EdgesInSameRegionMatch edgesInSameRegionMatch : edgesInSameRegionMatches) {											
+		for (EdgesInSameRegionMatch edgesInSameRegionMatch : edgesInSameRegionMatcher.getAllMatches(null, null, null, region)) {											
 			// Ha a két végpont a helyes region-ben van
-			if (edgesInSameRegionMatch.getParentRegion() == region &&
-					stateLocationMap.containsKey(edgesInSameRegionMatch.getSource()) && stateLocationMap.containsKey(edgesInSameRegionMatch.getTarget())) {								
-				//Létrehozunk egy edge-t
-				Edge anEdge = builder.createEdge(template); 
-				//Beállítjuk az edge forrását és célját
-				anEdge.setSource(stateLocationMap.get(edgesInSameRegionMatch.getSource()));
-				anEdge.setTarget(stateLocationMap.get(edgesInSameRegionMatch.getTarget()));
-				transitionEdgeMap.put(edgesInSameRegionMatch.getTransition(), anEdge);
-			}				
+			if (!(stateLocationMap.containsKey(edgesInSameRegionMatch.getSource()) && stateLocationMap.containsKey(edgesInSameRegionMatch.getTarget()))) {								
+				throw new Exception("The source or the target is null.");
+			}
+			//Létrehozunk egy edge-t
+			Edge anEdge = builder.createEdge(template); 
+			//Beállítjuk az edge forrását és célját
+			anEdge.setSource(stateLocationMap.get(edgesInSameRegionMatch.getSource()));
+			anEdge.setTarget(stateLocationMap.get(edgesInSameRegionMatch.getTarget()));
+			transitionEdgeMap.put(edgesInSameRegionMatch.getTransition(), anEdge);
+							
 		}
 	}
 	
 	/**
 	 * Ez a metódus hozza létre a composite state-ek entry locationjét. Ez a state-be lépéskor az alrégiókba való lépés miatt szükséges.
 	 * (Hogy az minden esetben megvalósuljon.)
-	 * @throws IncQueryException
+	 * @throws Exception 
 	 */
-	private void createEntryForCompositeStates() throws IncQueryException {
+	private void createEntryForCompositeStates() throws Exception {
 		// Lekérjük az állapotokat
 		CompositeStatesMatcher compositeStatesMatcher = engine.getMatcher(CompositeStatesQuerySpecification.instance());
 		SourceAndTargetOfTransitionsMatcher sourceAndTargetOfTransitionsMatcher = engine.getMatcher(SourceAndTargetOfTransitionsQuerySpecification.instance());
-		Collection<CompositeStatesMatch> allCompositeStatesMatches = compositeStatesMatcher.getAllMatches();
 		// Megnézzük a state matcheket és létrehozzuk az entry locationöket
-		for (CompositeStatesMatch compositeStateMatch : allCompositeStatesMatches) {				
+		for (CompositeStatesMatch compositeStateMatch : compositeStatesMatcher.getAllMatches()) {				
 			// Létrehozzuk a locationt, majd a megfelelõ éleket a megfelelõ location-ökbe kötjük
 			Location stateEntryLocation = createEntryLocation(compositeStateMatch.getCompositeState(), compositeStateMatch.getParentRegion());
 			// Átállítjuk a bejövõ élek targetjét, ehhez felhasználjuk az összes élet lekérdezõ metódust
-			for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : sourceAndTargetOfTransitionsMatcher.getAllMatches()) {
-				if (sourceAndTargetOfTransitionsMatch.getTarget() == compositeStateMatch.getCompositeState()) {
-					if (transitionEdgeMap.containsKey(sourceAndTargetOfTransitionsMatch.getTransition())) {
-						transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()).setTarget(stateEntryLocation);
-					}
-				}
+			for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : sourceAndTargetOfTransitionsMatcher.getAllMatches(null, null, compositeStateMatch.getCompositeState())) {
+				if (!(transitionEdgeMap.containsKey(sourceAndTargetOfTransitionsMatch.getTransition()))) {
+					throw new Exception("The transition is not mapped: " + sourceAndTargetOfTransitionsMatch.getTransition());
+				}	
+				transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()).setTarget(stateEntryLocation);
 			}
 		}
 	}
@@ -530,9 +517,8 @@ public class CommandHandler extends AbstractHandler {
 	private void createEntryEdgesForAbstractionLevels() throws IncQueryException {
 		// Lekérjük a composite állapotokat
 		CompositeStatesMatcher compositeStatesMatcher = engine.getMatcher(CompositeStatesQuerySpecification.instance());
-		Collection<CompositeStatesMatch> allCompositeStatesMatches = compositeStatesMatcher.getAllMatches();
 		// Megnézzük a state matcheket és létrehozzuk az entry locationöket
-		for (CompositeStatesMatch compositeStateMatch : allCompositeStatesMatches) {
+		for (CompositeStatesMatch compositeStateMatch : compositeStatesMatcher.getAllMatches()) {
 			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
 			Edge entryEdge = hasEntryLoc.get(compositeStateMatch.getCompositeState());
 			builder.setEdgeSync(entryEdge, syncChanVar + (syncChanId), true);
