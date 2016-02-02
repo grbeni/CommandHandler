@@ -329,7 +329,8 @@ public class CommandHandler extends AbstractHandler {
 		createTemplateValidityGuards();
 		
 		// Entry kimenõ élek beSyncelése
-		createSyncFromEntries();
+		// Sajnos nem mûködik ebben a forméban, hogy egyszerre jöjjenek ki az entry node-ból :(
+		//createSyncFromEntries();
 		
 		// After .. kifejezések transzformálása
 		createTimingEvents();
@@ -755,7 +756,12 @@ public class CommandHandler extends AbstractHandler {
 			else {
 				Edge fromGeneratedInit = builder.createEdge(regionTemplateMap.get(subregion));
 				builder.setEdgeSource(fromGeneratedInit, hasInitLoc.get(regionTemplateMap.get(subregion)));
-				builder.setEdgeTarget(fromGeneratedInit, stateLocationMap.get(Helper.getTargetOfEntry(Helper.getEntryOfRegion(subregion))));
+				if (hasEntryLoc.containsKey(stateLocationMap.get(Helper.getTargetOfEntry(Helper.getEntryOfRegion(subregion))))) {
+					builder.setEdgeTarget(fromGeneratedInit, builder.getEdgeSource(hasEntryLoc.get(stateLocationMap.get(Helper.getTargetOfEntry(Helper.getEntryOfRegion(subregion))))));
+				}
+				else {
+					builder.setEdgeTarget(fromGeneratedInit, stateLocationMap.get(Helper.getTargetOfEntry(Helper.getEntryOfRegion(subregion))));
+				}
 				builder.setEdgeSync(fromGeneratedInit, syncChanVar + syncChanId, false);
 				builder.setEdgeUpdate(fromGeneratedInit, isActiveVar + " = true");
 			}
