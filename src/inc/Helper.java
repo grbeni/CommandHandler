@@ -35,11 +35,11 @@ import org.yakindu.sct.model.sgraph.Vertex;
 public class Helper {
 
 	private static IncQueryEngine engine;
-	private static RunOnceQueryEngine runOnceQueryEngine;
+	private static RunOnceQueryEngine runOnceEngine;
 	
 	public static void setEngine(IncQueryEngine engine, RunOnceQueryEngine runOnceQueryEngine) {
 		Helper.engine = engine;
-		Helper.runOnceQueryEngine = runOnceQueryEngine;		
+		Helper.runOnceEngine = runOnceQueryEngine;		
 	}
 	
 	/**
@@ -225,9 +225,9 @@ public class Helper {
 	 * @throws IncQueryException
 	 */
 	public static boolean hasEntryEvent(Vertex state) throws IncQueryException {
-		StatesWithEntryEventMatcher statesWithEntryEventMatcher = engine.getMatcher(StatesWithEntryEventQuerySpecification.instance());
-		for (StatesWithEntryEventMatch statesWithEntryEventMatch : statesWithEntryEventMatcher.getAllMatches()) {
+		for (StatesWithEntryEventMatch statesWithEntryEventMatch : runOnceEngine.getAllMatches(StatesWithEntryEventMatcher.querySpecification())) {
 			if (statesWithEntryEventMatch.getState() == state) {
+				System.out.println("Igaz");
 				return true;
 			}
 		}
@@ -241,10 +241,7 @@ public class Helper {
 	 * @throws IncQueryException
 	 */
 	public static boolean hasExitEvent(Vertex state) throws IncQueryException {
-		StatesWithExitEventWithoutOutgoingTransitionMatcher statesWithExitEventWithoutOutgoingTransitionMatcher = 
-				engine.getMatcher(StatesWithExitEventWithoutOutgoingTransitionQuerySpecification.instance());
-		for (StatesWithExitEventWithoutOutgoingTransitionMatch statesWithExitEventMatch : 
-			statesWithExitEventWithoutOutgoingTransitionMatcher.getAllMatches()) {
+		for (StatesWithExitEventWithoutOutgoingTransitionMatch statesWithExitEventMatch :runOnceEngine.getAllMatches(StatesWithExitEventWithoutOutgoingTransitionMatcher.querySpecification())) {
 			if (statesWithExitEventMatch.getState() == state) {
 				return true;				
 			}

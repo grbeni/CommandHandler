@@ -680,12 +680,12 @@ public class CommandHandler extends AbstractHandler {
 			// Ez az él felel majd meg a regionökön átívelõ transitionnek
 			transitionEdgeMap.put(transition, abstractionEdge);
 			// Ha a target composite state, akkor belépésre minden alrégiójába is belépünk
-			if (Helper.isCompositeState(target)) {
+			//if (Helper.isCompositeState(target)) {
 				List<Region> pickedSubregions = new ArrayList<Region>(((State) target).getRegions()); // Talán addAll kéne?
 				pickedSubregions.removeAll(visitedRegions);
 				setAllRegionsWithSync(true, pickedSubregions);		
 				setSyncFromGeneratedInit(pickedSubregions);
-			}
+			//}
 		}	
 		// Ha nem a legfölsõ szinten vagyunk, akkor létrehozzuk a ? szinkronizációs éleket minden állapotból a megfelelõ állapotba
 		else {
@@ -706,7 +706,7 @@ public class CommandHandler extends AbstractHandler {
 					builder.setEdgeTarget(syncEdge, stateLocationMap.get(target));
 				}					
 				// Ha a targetnek van entryEventje, akkor azt rá kell írni az élre
-				if (Helper.hasEntryEvent(target)) {
+				if (Helper.hasEntryEvent(target) && !Helper.isCompositeState(target)/* && (lastLevel != Helper.getLevelOfVertex(target))*/) {
 					for (StatesWithEntryEventMatch statesWithEntryEventMatch : runOnceEngine.getAllMatches(StatesWithEntryEventMatcher.querySpecification())) {
 						if (statesWithEntryEventMatch.getState() == target) {
 							String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
@@ -725,10 +725,20 @@ public class CommandHandler extends AbstractHandler {
 				if (lastLevel == Helper.getLevelOfVertex(target) && hasEntryLoc.containsKey(target)) {
 					builder.setEdgeTarget(syncEdge, builder.getEdgeSource(hasEntryLoc.get(target)));
 				}							
-				// Itt már nem kell entryLocba kötni, mert az lehet, hogy elrontaná az alsóbb régiók helyes állapotatit (tehát csak legalsó szinten kell entryLocba kötni)
+				// Itt már nem kell entryLocba kötni, mert az lehet, hogy elrontaná az alsóbb régiók helyes állapotait (tehát csak legalsó szinten kell entryLocba kötni)
 				else {					
 					builder.setEdgeTarget(syncEdge, stateLocationMap.get(target));
 				}	
+				
+				if (Helper.hasEntryEvent(target) && !Helper.isCompositeState(target)) {
+					for (StatesWithEntryEventMatch statesWithEntryEventMatch : runOnceEngine.getAllMatches(StatesWithEntryEventMatcher.querySpecification())) {
+						if (statesWithEntryEventMatch.getState() == target) {
+							String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
+							builder.setEdgeUpdate(syncEdge, effect);
+						}
+					}
+				}
+				
 				builder.setEdgeSync(syncEdge, syncChanVar + (syncChanId), false);
 				builder.setEdgeUpdate(syncEdge, isActiveVar + " = true");	
 			}
