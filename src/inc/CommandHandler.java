@@ -649,9 +649,9 @@ public class CommandHandler extends AbstractHandler {
 	 * @param target Yakindu vertex, a tranzició végpontja.
 	 * @param transition Yakindu transition, ennek fogjuk megfeleltetni a legfelsõ szinten létrehozott edget.
 	 * @param lastLevel Egész szám, amely megmondja, hogy a target hányadik szinten van.
-	 * @throws IncQueryException 
+	 * @throws Exception 
 	 */ 
-	private void createEdgesWhenSourceLesser(Vertex source, Vertex target, Transition transition, int lastLevel, int levelDifference, List<Region> visitedRegions) throws IncQueryException {
+	private void createEdgesWhenSourceLesser(Vertex source, Vertex target, Transition transition, int lastLevel, int levelDifference, List<Region> visitedRegions) throws Exception {
 		// Rekurzió:
 		// Visszamegyünk a legfölsõ szintre, majd onnan visszalépkedve, sorban minden szinten létrehozzuk a szinkronizációkat
 		if (source.getParentRegion() != target.getParentRegion()) {
@@ -692,8 +692,11 @@ public class CommandHandler extends AbstractHandler {
 				Edge syncEdge = builder.createEdge(regionTemplateMap.get(verticesOfRegionsMatch.getRegion()));					
 				builder.setEdgeSource(syncEdge, stateLocationMap.get(verticesOfRegionsMatch.getVertex()));
 				// Ha utolsó szinten vagyunk, és egy composite state-be megyünk, akkor az entryLocjába kell kötni
-				if (lastLevel == Helper.getLevelOfVertex(target) || hasEntryLoc.containsKey(target)) {
+				if (lastLevel == Helper.getLevelOfVertex(target) && hasEntryLoc.containsKey(target)) {
 					builder.setEdgeTarget(syncEdge, builder.getEdgeSource(hasEntryLoc.get(target)));
+					if (hasEntryLoc.get(target) == null) {
+						throw new Exception("Itt a hiba!");							
+					}
 				}							
 				// Itt már nem kell entryLocba kötni, mert az lehet, hogy elrontaná az alsóbb régiók helyes állapotatit (tehát csak legalsó szinten kell entryLocba kötni)
 				else {					
@@ -716,7 +719,7 @@ public class CommandHandler extends AbstractHandler {
 				Edge syncEdge = builder.createEdge(regionTemplateMap.get(target.getParentRegion()));
 				builder.setEdgeSource(syncEdge, hasInitLoc.get(regionTemplateMap.get(target.getParentRegion())));
 				// Ha utolsó szinten vagyunk, és egy composite state-be megyünk, akkor az entryLocjába kell kötni
-				if (lastLevel == Helper.getLevelOfVertex(target) || hasEntryLoc.containsKey(target)) {
+				if (lastLevel == Helper.getLevelOfVertex(target) && hasEntryLoc.containsKey(target)) {
 					builder.setEdgeTarget(syncEdge, builder.getEdgeSource(hasEntryLoc.get(target)));
 				}							
 				// Itt már nem kell entryLocba kötni, mert az lehet, hogy elrontaná az alsóbb régiók helyes állapotatit (tehát csak legalsó szinten kell entryLocba kötni)
