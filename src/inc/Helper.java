@@ -24,6 +24,7 @@ import org.yakindu.sct.model.sgraph.Entry;
 import org.yakindu.sct.model.sgraph.Region;
 import org.yakindu.sct.model.sgraph.State;
 import org.yakindu.sct.model.sgraph.Statechart;
+import org.yakindu.sct.model.sgraph.Transition;
 import org.yakindu.sct.model.sgraph.Vertex;
 
 /**
@@ -262,6 +263,13 @@ public class Helper {
 			return true;
 		}
 		return false;
+	}
+	
+	public static Vertex getTargetOfEntry(Entry entry) throws Exception {
+		for (Transition transition : entry.getOutgoingTransitions()) {
+			return transition.getTarget();
+		}
+		throw new Exception("The entry has no outgoing transitions! Parent region: " + entry.getParentRegion().getName());
 	}
 
 	public static String getTemplateNameFromRegionName(Region region) throws IncQueryException {

@@ -512,9 +512,9 @@ public class CommandHandler extends AbstractHandler {
 	/**
 	 * Ez a metódus hozza létre a composite state-ekbe vezetõ élen a broadcast ! szinkornizációs csatornát, 
 	 * és az eggyel alatta lévõ régiókban a ? szinkornizációs csatornákat. Ez utóbbi végpontja attól függ, hogy értelmezett-e a régióban history.
-	 * @throws IncQueryException
+	 * @throws Exception 
 	 */
-	private void createEntryEdgesForAbstractionLevels() throws IncQueryException {
+	private void createEntryEdgesForAbstractionLevels() throws Exception {
 		// Lekérjük a composite állapotokat
 		CompositeStatesMatcher compositeStatesMatcher = engine.getMatcher(CompositeStatesQuerySpecification.instance());
 		// Megnézzük a state matcheket és létrehozzuk az entry locationöket
@@ -522,11 +522,11 @@ public class CommandHandler extends AbstractHandler {
 			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
 			Edge entryEdge = hasEntryLoc.get(compositeStateMatch.getCompositeState());
 			builder.setEdgeSync(entryEdge, syncChanVar + (syncChanId), true);
-			// Minden eggyel alatti régióban létrehozzuk a szükséges ? sync-eket
-			setAllRegionsWithSync(true, compositeStateMatch.getCompositeState().getRegions());
 			for (Region subregion : compositeStateMatch.getCompositeState().getRegions()) {
 				generateNewInitLocation(subregion);
 			}
+			// Minden eggyel alatti régióban létrehozzuk a szükséges ? sync-eket
+			setAllRegionsWithSync(true, compositeStateMatch.getCompositeState().getRegions());			
 		}
 	}
 	
@@ -566,9 +566,9 @@ public class CommandHandler extends AbstractHandler {
 	 * Ezek a csatornák vagy önmagukba vagy az region entrybe vezetnek.
 	 * @param needInit Kell-e initLocation a template-be.
 	 * @param regionList Yakindu regionök listája, amelyeken létre szeretnénk hozni a ? csatornákat az update-ekkel.
-	 * @throws IncQueryException 
+	 * @throws Exception 
 	 */
-	private void setAllRegionsWithSync(boolean toBeTrue, List<Region> regionList) throws IncQueryException {
+	private void setAllRegionsWithSync(boolean toBeTrue, List<Region> regionList) throws Exception {
 		VerticesOfRegionsMatcher verticesOfRegionsMatcher = engine.getMatcher(VerticesOfRegionsQuerySpecification.instance());
 		for (Region subregion : regionList) {	
 			for (VerticesOfRegionsMatch verticesOfRegionMatch : verticesOfRegionsMatcher.getAllMatches(subregion, null)) {
@@ -597,7 +597,7 @@ public class CommandHandler extends AbstractHandler {
 						builder.setEdgeTarget(syncEdge, stateLocationMap.get(verticesOfRegionMatch.getVertex()));
 					}
 				}
-			}
+			}			
 		}
 	}
 	
@@ -682,7 +682,8 @@ public class CommandHandler extends AbstractHandler {
 			if (Helper.isCompositeState(target)) {
 				List<Region> pickedSubregions = new ArrayList<Region>(((State) target).getRegions()); // Talán addAll kéne?
 				pickedSubregions.removeAll(visitedRegions);
-				setAllRegionsWithSync(true, pickedSubregions);				
+				setAllRegionsWithSync(true, pickedSubregions);		
+				setSyncFromGeneratedInit(pickedSubregions);
 			}
 		}	
 		// Ha nem a legfölsõ szinten vagyunk, akkor létrehozzuk a ? szinkronizációs éleket minden állapotból a megfelelõ állapotba
@@ -691,6 +692,7 @@ public class CommandHandler extends AbstractHandler {
 			for (VerticesOfRegionsMatch verticesOfRegionsMatch : verticesOfRegionsMatcher.getAllMatches(target.getParentRegion(), null)) {				
 				Edge syncEdge = builder.createEdge(regionTemplateMap.get(verticesOfRegionsMatch.getRegion()));					
 				builder.setEdgeSource(syncEdge, stateLocationMap.get(verticesOfRegionsMatch.getVertex()));
+				
 				// Ha utolsó szinten vagyunk, és egy composite state-be megyünk, akkor az entryLocjába kell kötni
 				if (lastLevel == Helper.getLevelOfVertex(target) && hasEntryLoc.containsKey(target)) {
 					builder.setEdgeTarget(syncEdge, builder.getEdgeSource(hasEntryLoc.get(target)));
@@ -730,12 +732,34 @@ public class CommandHandler extends AbstractHandler {
 				builder.setEdgeUpdate(syncEdge, isActiveVar + " = true");	
 			}
 			// Ha a target composite state, akkor ezt minden region-jére megismételjük, kivéve ezt a regiont
-			if (Helper.isCompositeState(target)) {
+			// Except if it is the last level: then we enter the state ordinarily
+			if (lastLevel != Helper.getLevelOfVertex(target) && Helper.isCompositeState(target)) {
 				List<Region> pickedSubregions = new ArrayList<Region>(((State) target).getRegions()); // Talán addAll kéne?
 				pickedSubregions.removeAll(visitedRegions);
-				setAllRegionsWithSync(true, pickedSubregions);				
+				setAllRegionsWithSync(true, pickedSubregions);		
+				setSyncFromGeneratedInit(pickedSubregions);
 			}
 		}		
+	}
+	
+	/**
+	 * This method creates a synchrnoizations from the generated init location to the first normal state.
+	 * @param visitedRegions Those Yakindu regions whose template equivalents we want to create the channels in.
+	 * @throws Exception
+	 */
+	private void setSyncFromGeneratedInit(List<Region> visitedRegions) throws Exception {
+		for (Region subregion: visitedRegions) {
+			if (!(hasInitLoc.containsKey(regionTemplateMap.get(subregion)))) {
+				throw new Exception("No initial location: " + subregion.getName());
+			}
+			else {
+				Edge fromGeneratedInit = builder.createEdge(regionTemplateMap.get(subregion));
+				builder.setEdgeSource(fromGeneratedInit, hasInitLoc.get(regionTemplateMap.get(subregion)));
+				builder.setEdgeTarget(fromGeneratedInit, stateLocationMap.get(Helper.getTargetOfEntry(Helper.getEntryOfRegion(subregion))));
+				builder.setEdgeSync(fromGeneratedInit, syncChanVar + syncChanId, false);
+				builder.setEdgeUpdate(fromGeneratedInit, isActiveVar + " = true");
+			}
+		}
 	}
 	
 	/**
@@ -745,9 +769,9 @@ public class CommandHandler extends AbstractHandler {
 	 * @param target Yakindu vertex, a tranzició végpontja.
 	 * @param transition Yakindu transition, ennek fogjuk megfeleltetni a legfelsõ szinten létrehozott edget.
 	 * @param lastLevel Egész szám, amely megmondja, hogy a source hányadik szinten van.
-	 * @throws IncQueryException 
+	 * @throws Exception 
 	 */
-	private void createEdgesWhenSourceGreater(Vertex source, Vertex target, Transition transition, int lastLevel, List<Region> visitedRegions) throws IncQueryException {
+	private void createEdgesWhenSourceGreater(Vertex source, Vertex target, Transition transition, int lastLevel, List<Region> visitedRegions) throws Exception {
 		// A legalsó szinten létrehozunk egy magába vezetõ élet:  
 		// Ez felel meg az alacsonyabb szintrõl magasabb szinten lévõ vertexbe vezetõ átmenetnek
 		if (Helper.getLevelOfVertex(source) == lastLevel) {
