@@ -697,9 +697,6 @@ public class CommandHandler extends AbstractHandler {
 				// Ha utolsó szinten vagyunk, és egy composite state-be megyünk, akkor az entryLocjába kell kötni
 				if (lastLevel == Helper.getLevelOfVertex(target) && hasEntryLoc.containsKey(target)) {
 					builder.setEdgeTarget(syncEdge, builder.getEdgeSource(hasEntryLoc.get(target)));
-					if (hasEntryLoc.get(target) == null) {
-						throw new Exception("Itt a hiba!");							
-					}
 				}							
 				// Itt már nem kell entryLocba kötni, mert az lehet, hogy elrontaná az alsóbb régiók helyes állapotatit (tehát csak legalsó szinten kell entryLocba kötni)
 				else {					
@@ -766,12 +763,7 @@ public class CommandHandler extends AbstractHandler {
 			else {
 				Edge fromGeneratedInit = builder.createEdge(regionTemplateMap.get(subregion));
 				builder.setEdgeSource(fromGeneratedInit, hasInitLoc.get(regionTemplateMap.get(subregion)));
-				if (hasEntryLoc.containsKey(stateLocationMap.get(Helper.getTargetOfEntry(Helper.getEntryOfRegion(subregion))))) {
-					builder.setEdgeTarget(fromGeneratedInit, builder.getEdgeSource(hasEntryLoc.get(stateLocationMap.get(Helper.getTargetOfEntry(Helper.getEntryOfRegion(subregion))))));
-				}
-				else {
-					builder.setEdgeTarget(fromGeneratedInit, stateLocationMap.get(Helper.getTargetOfEntry(Helper.getEntryOfRegion(subregion))));
-				}
+				builder.setEdgeTarget(fromGeneratedInit, stateLocationMap.get(Helper.getEntryOfRegion(subregion)));
 				builder.setEdgeSync(fromGeneratedInit, syncChanVar + syncChanId, false);
 				builder.setEdgeUpdate(fromGeneratedInit, isActiveVar + " = true");
 			}
