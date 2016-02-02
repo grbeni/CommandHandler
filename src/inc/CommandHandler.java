@@ -688,30 +688,28 @@ public class CommandHandler extends AbstractHandler {
 		// Ha nem a legfölsõ szinten vagyunk, akkor létrehozzuk a ? szinkronizációs éleket minden állapotból a megfelelõ állapotba
 		else {
 			VerticesOfRegionsMatcher verticesOfRegionsMatcher = engine.getMatcher(VerticesOfRegionsQuerySpecification.instance());
-			for (VerticesOfRegionsMatch verticesOfRegionsMatch : verticesOfRegionsMatcher.getAllMatches()) {
-				if (verticesOfRegionsMatch.getRegion() == target.getParentRegion()) {
-					Edge syncEdge = builder.createEdge(regionTemplateMap.get(verticesOfRegionsMatch.getRegion()));					
-					builder.setEdgeSource(syncEdge, stateLocationMap.get(verticesOfRegionsMatch.getVertex()));
-					// Ha utolsó szinten vagyunk, és egy composite state-be megyünk, akkor az entryLocjába kell kötni
-					if (lastLevel == Helper.getLevelOfVertex(target) || hasEntryLoc.containsKey(target)) {
-						builder.setEdgeTarget(syncEdge, builder.getEdgeSource(hasEntryLoc.get(target)));
-					}							
-					// Itt már nem kell entryLocba kötni, mert az lehet, hogy elrontaná az alsóbb régiók helyes állapotatit (tehát csak legalsó szinten kell entryLocba kötni)
-					else {					
-						builder.setEdgeTarget(syncEdge, stateLocationMap.get(target));
-					}					
-					// Ha a targetnek van entryEventje, akkor azt rá kell írni az élre
-					if (Helper.hasEntryEvent(target)) {
-						for (StatesWithEntryEventMatch statesWithEntryEventMatch : runOnceEngine.getAllMatches(StatesWithEntryEventMatcher.querySpecification())) {
-							if (statesWithEntryEventMatch.getState() == target) {
-								String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
-								builder.setEdgeUpdate(syncEdge, effect);
-							}
+			for (VerticesOfRegionsMatch verticesOfRegionsMatch : verticesOfRegionsMatcher.getAllMatches(target.getParentRegion(), null)) {				
+				Edge syncEdge = builder.createEdge(regionTemplateMap.get(verticesOfRegionsMatch.getRegion()));					
+				builder.setEdgeSource(syncEdge, stateLocationMap.get(verticesOfRegionsMatch.getVertex()));
+				// Ha utolsó szinten vagyunk, és egy composite state-be megyünk, akkor az entryLocjába kell kötni
+				if (lastLevel == Helper.getLevelOfVertex(target) || hasEntryLoc.containsKey(target)) {
+					builder.setEdgeTarget(syncEdge, builder.getEdgeSource(hasEntryLoc.get(target)));
+				}							
+				// Itt már nem kell entryLocba kötni, mert az lehet, hogy elrontaná az alsóbb régiók helyes állapotatit (tehát csak legalsó szinten kell entryLocba kötni)
+				else {					
+					builder.setEdgeTarget(syncEdge, stateLocationMap.get(target));
+				}					
+				// Ha a targetnek van entryEventje, akkor azt rá kell írni az élre
+				if (Helper.hasEntryEvent(target)) {
+					for (StatesWithEntryEventMatch statesWithEntryEventMatch : runOnceEngine.getAllMatches(StatesWithEntryEventMatcher.querySpecification())) {
+						if (statesWithEntryEventMatch.getState() == target) {
+							String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
+							builder.setEdgeUpdate(syncEdge, effect);
 						}
 					}
-					builder.setEdgeSync(syncEdge, syncChanVar + (syncChanId), false);
-					builder.setEdgeUpdate(syncEdge, isActiveVar + " = true");		
 				}
+				builder.setEdgeSync(syncEdge, syncChanVar + (syncChanId), false);
+				builder.setEdgeUpdate(syncEdge, isActiveVar + " = true");				
 			}
 			// Altemplate "initial location"-jét is bekötjük a megfelelõ locationbe
 			if (hasInitLoc.containsKey(regionTemplateMap.get(target.getParentRegion()))) {
@@ -845,10 +843,8 @@ public class CommandHandler extends AbstractHandler {
 				Location stateEntryLocation = createEntryLocation(statesWithEntryEventMatch.getState(), statesWithEntryEventMatch.getParentRegion());
 				builder.setEdgeUpdate(hasEntryLoc.get(statesWithEntryEventMatch.getState()), effect);
 				// Átállítjuk a bejövõ élek targetjét
-				for (EdgesInSameRegionMatch edgesInSameRegionMatch : edgesInSameRegionMatcher.getAllMatches()) {
-					if (edgesInSameRegionMatch.getTarget() == statesWithEntryEventMatch.getState()) {
-						transitionEdgeMap.get(edgesInSameRegionMatch.getTransition()).setTarget(stateEntryLocation);
-					}
+				for (EdgesInSameRegionMatch edgesInSameRegionMatch : edgesInSameRegionMatcher.getAllMatches(null, null, statesWithEntryEventMatch.getState(), null)) {				
+					builder.setEdgeTarget(transitionEdgeMap.get(edgesInSameRegionMatch.getTransition()), stateEntryLocation);				
 				}
 			}
 			// Ha már van entry state-je
