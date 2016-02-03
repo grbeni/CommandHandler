@@ -24,7 +24,7 @@ class UppaalQueryGenerator {
 	'''
 	
 	def static createReachabilityQuery() '''
-		«FOR locationName : Helper.getNamesOfLocations»E<> «locationName»
+		«FOR locationName : Helper.getExpressionsOfLocations»E<> «locationName»
 		«ENDFOR»
 	'''
 	

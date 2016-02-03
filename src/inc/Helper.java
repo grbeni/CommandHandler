@@ -143,13 +143,7 @@ public class Helper {
 	 * @throws IncQueryException
 	 */
 	public static boolean isEntry(Vertex vertex) throws IncQueryException {
-		EntryOfRegionsMatcher entryOfRegionsMatcher = engine.getMatcher(EntryOfRegionsQuerySpecification.instance());
-		for (EntryOfRegionsMatch entryMatch : entryOfRegionsMatcher.getAllMatches()) {
-			if (entryMatch.getEntry() == vertex) {
-				return true;
-			}
-		}
-		return false;
+		return (vertex instanceof Entry);
 	}
 	
 	/**
@@ -160,10 +154,8 @@ public class Helper {
 	 */
 	public static boolean isTopRegion(Region region) throws IncQueryException {
 		TopRegionsMatcher topRegionsMatcher = engine.getMatcher(TopRegionsQuerySpecification.instance());
-		for (TopRegionsMatch topRegionMatch : topRegionsMatcher.getAllMatches()) {
-			if (topRegionMatch.getRegion() == region) {
-				return true;
-			}
+		for (@SuppressWarnings("unused") TopRegionsMatch topRegionMatch : topRegionsMatcher.getAllMatches(region)) {
+			return true;
 		}
 		return false;
 	}
@@ -178,17 +170,13 @@ public class Helper {
 	public static int getLevelOfVertex(Vertex vertex) throws IncQueryException {
 		VerticesOfRegionsMatcher verticesOfRegionsMatcher = engine.getMatcher(VerticesOfRegionsQuerySpecification.instance());
 		RegionsOfCompositeStatesMatcher regionsOfCompositeStatesMatcher = engine.getMatcher(RegionsOfCompositeStatesQuerySpecification.instance());
-		for (VerticesOfRegionsMatch verticesOfRegionsMatch : verticesOfRegionsMatcher.getAllMatches()) {
-			if (verticesOfRegionsMatch.getVertex() == vertex) {
-				if (Helper.isTopRegion(verticesOfRegionsMatch.getRegion())) {
-					return 0;
-				}
-				else {
-					for (RegionsOfCompositeStatesMatch regionsOfCompositeStatesMatch : regionsOfCompositeStatesMatcher.getAllMatches()) {
-						if (regionsOfCompositeStatesMatch.getSubregion() == verticesOfRegionsMatch.getRegion()) {
-							return (getLevelOfVertex(regionsOfCompositeStatesMatch.getCompositeState()) + 1);
-						}
-					}
+		for (VerticesOfRegionsMatch verticesOfRegionsMatch : verticesOfRegionsMatcher.getAllMatches(null, vertex)) {
+			if (Helper.isTopRegion(verticesOfRegionsMatch.getRegion())) {
+				return 0;
+			}
+			else {
+				for (RegionsOfCompositeStatesMatch regionsOfCompositeStatesMatch : regionsOfCompositeStatesMatcher.getAllMatches(null, null, null, verticesOfRegionsMatch.getRegion())) {
+					return (getLevelOfVertex(regionsOfCompositeStatesMatch.getCompositeState()) + 1);					
 				}
 			}
 		}
@@ -254,6 +242,12 @@ public class Helper {
 		return false;
 	}
 	
+	/**
+	 * This method returns the target vertex of the entry's outgoing transition.
+	 * @param entry The entry
+	 * @return The target vertex
+	 * @throws Exception
+	 */
 	public static Vertex getTargetOfEntry(Entry entry) throws Exception {
 		for (Transition transition : entry.getOutgoingTransitions()) {
 			return transition.getTarget();
@@ -261,6 +255,12 @@ public class Helper {
 		throw new Exception("The entry has no outgoing transitions! Parent region: " + entry.getParentRegion().getName());
 	}
 
+	/**
+	 * This method returns the template name of the addded region.
+	 * @param region The Yakinu region whose template equivalent' s name is wanted
+	 * @return The template equivalent name
+	 * @throws IncQueryException
+	 */
 	public static String getTemplateNameFromRegionName(Region region) throws IncQueryException {
 		if (isTopRegion(region)) {
 			return (region.getName() + "OfStatechart").replaceAll(" ", "");			
@@ -270,6 +270,12 @@ public class Helper {
 		}
 	}
 	
+	/**
+	 * This method returns whether there is a Yakindu event with the added name.
+	 * @param name Any string
+	 * @return
+	 * @throws IncQueryException
+	 */
 	public static boolean isEventName(String name) throws IncQueryException {
 		EventsMatcher eventsMatcher = engine.getMatcher(EventsQuerySpecification.instance());
 		for (@SuppressWarnings("unused") EventsMatch eventsMatch : eventsMatcher.getAllMatches(name)) {
@@ -278,16 +284,34 @@ public class Helper {
 		return false;
 	}
 	
+	/**
+	 * Returns the name of the variable of the in event.
+	 * @param eventName The in event name
+	 * @return
+	 * @throws IncQueryException
+	 */
 	public static String getInEventValueName(String eventName) throws IncQueryException {
 		return eventName + "Value";
 	}
 	
+	/**
+	 * Returns an Uppaal expression that refers to the Uppaal equivalent of the Yakidu state:
+	 * Process_"templateName"."stateName" 
+	 * @param state
+	 * @return
+	 * @throws IncQueryException
+	 */
 	public static String getExpressionFromStateName(State state) throws IncQueryException {
 		final String process = "Process_";		
 		return process + getTemplateNameFromRegionName(state.getParentRegion()) + "." + state.getName();
 	}
 
-	public static Collection<String> getNamesOfLocations() throws IncQueryException {
+	/**
+	 * Returns a collection of Uppaal location expression of all the states of  the Yakindu model.
+	 * @return
+	 * @throws IncQueryException
+	 */
+	public static Collection<String> getExpressionsOfLocations() throws IncQueryException {
 		StatesMatcher statesMatcher = engine.getMatcher(StatesQuerySpecification.instance());
 		Set<String> locationNames = new HashSet<String>();
 		for (StatesMatch stateMatch : statesMatcher.getAllMatches()) {
