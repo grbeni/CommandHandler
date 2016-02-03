@@ -547,14 +547,16 @@ public class CommandHandler extends AbstractHandler {
 			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
 			// Minden kimenõ élre ráírjuk a kilépési sync-et
 			for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : sourceAndTargetOfTransitionsMatcher.getAllMatches(null, compositeStateMatch.getCompositeState(), null)) {				
-				if (transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()).getSynchronization() == null) {
-					builder.setEdgeSync(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), syncChanVar + (syncChanId), true);
+				if (transitionEdgeMap.containsKey(sourceAndTargetOfTransitionsMatch.getTransition())) { // So we investigate only same region edges
+					if (transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()).getSynchronization() == null) {
+						builder.setEdgeSync(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), syncChanVar + (syncChanId), true);
+					}
+					else {
+						Edge syncEdge = createSyncLocation(stateLocationMap.get(sourceAndTargetOfTransitionsMatch.getTarget()), "CompositeSyncLocation" + (++id), null);
+						builder.setEdgeSync(syncEdge, syncChanVar + (syncChanId), true);
+						builder.setEdgeTarget(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), builder.getEdgeSource(syncEdge));
+					}	
 				}
-				else {
-					Edge syncEdge = createSyncLocation(stateLocationMap.get(sourceAndTargetOfTransitionsMatch.getTarget()), "CompositeSyncLocation" + (++id), null);
-					builder.setEdgeSync(syncEdge, syncChanVar + (syncChanId), true);
-					builder.setEdgeTarget(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), builder.getEdgeSource(syncEdge));
-				}				
 			}
 			// Letiltjuk az összes alatta lévõ region-t
 			List<Region> subregionList = new ArrayList<Region>();
@@ -930,6 +932,12 @@ public class CommandHandler extends AbstractHandler {
 		
 	}
 	
+	/**
+	 * This method creates a raising sync edge if the local reaction has an event raising expression.
+	 * @param localReaction The Yakindu local reaction, that we investigate whether it has an event raising expression
+	 * @param localReactionEdge The Uppaal loop edge that contains the local reaction trigger/guard.
+	 * @throws Exception
+	 */
 	private void createRaisingLocationForLocalReaction(LocalReaction localReaction, Edge localReactionEdge) throws Exception {
 		LocalReactionValueOfEffectMatcher localReactionValueOfEffectMatcher = engine.getMatcher(LocalReactionValueOfEffectQuerySpecification.instance());
 		for (LocalReactionValueOfEffectMatch localReactionValueOfEffectMatch : localReactionValueOfEffectMatcher.getAllMatches(localReaction, null)) {
@@ -957,6 +965,7 @@ public class CommandHandler extends AbstractHandler {
 			// Ha van guard-ja, akkor azt transzformáljuk, és ráírjuk az edge-re
 			String guard = " " + UppaalCodeGenerator.transformExpression(edgesWithGuardMatch.getExpression());
 			for (EventsWithTypeMatch eventsWithTypeMatch : eventsWithTypeMatcher.getAllMatches()) {
+				// If the guard expression cointains an in event variable, then it has to be replaced by the in event variable.
 				if (guard.contains(" " + eventsWithTypeMatch.getName() + " ")) {
 					guard = guard.replaceAll(" " + eventsWithTypeMatch.getName() + " ", " " + Helper.getInEventValueName(eventsWithTypeMatch.getName()) + " ");	
 					builder.setEdgeSync(transitionEdgeMap.get(edgesWithGuardMatch.getTransition()), eventsWithTypeMatch.getName(), false);
@@ -1001,8 +1010,9 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
-	 * Ez a metódus felel az event raising megvalósításáért.
-	 * @throws Exception jelzi, ha nem mûködik a szinkronizáció. (Nem tökéletes még ez a kód.)
+	 * This method creates raise events as another edge synchronizations where it is needed.
+	 * (If more than one raising event on an edge, the result will be linked committed locations with synched edges.)
+	 * @throws Exception jelzi, ha nem mûködik a szinkronizáció. 
 	 */
 	private void createRaisingEventSyncs() throws Exception {
 		EdgesWithRaisingEventMatcher edgesWithRaisingEventMatcher = engine.getMatcher(EdgesWithRaisingEventQuerySpecification.instance());
@@ -1010,6 +1020,7 @@ public class CommandHandler extends AbstractHandler {
 		for (EdgesWithRaisingEventMatch edgesWithRaisingEventMatch : edgesWithRaisingEventMatcher.getAllMatches()) {
 			Edge raiseEdge = createSyncLocationWithString(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()).getTarget(), "Raise_" + edgesWithRaisingEventMatch.getName() + (raiseId++), edgesWithRaisingEventMatch.getName());
 			builder.setEdgeTarget(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()), raiseEdge.getSource());
+			// Now we apply the updates if the raised event is an in event
 			for (RaisingExpressionsWithAssignmentMatch raisingExpressionsWithAssignmentMatch : raisingExpressionsWithAssignmentMatcher.getAllMatches(edgesWithRaisingEventMatch.getTransition(), edgesWithRaisingEventMatch.getElement(), null, null)) {
 				 builder.setEdgeUpdate(transitionEdgeMap.get(edgesWithRaisingEventMatch.getTransition()), Helper.getInEventValueName(raisingExpressionsWithAssignmentMatch.getName()) + " = " + UppaalCodeGenerator.transformExpression(raisingExpressionsWithAssignmentMatch.getValue()));
 			}
