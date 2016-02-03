@@ -18,6 +18,7 @@ import java.util.Set;
 import org.eclipse.incquery.runtime.api.IncQueryEngine;
 import org.eclipse.incquery.runtime.api.impl.RunOnceQueryEngine;
 import org.eclipse.incquery.runtime.exception.IncQueryException;
+import org.yakindu.sct.model.sgraph.Choice;
 import org.yakindu.sct.model.sgraph.Entry;
 import org.yakindu.sct.model.sgraph.Region;
 import org.yakindu.sct.model.sgraph.State;
@@ -77,10 +78,8 @@ public class Helper {
 		}
 		else {
 			RegionsOfCompositeStatesMatcher regionsOfCompositeStatesMatcher = engine.getMatcher(RegionsOfCompositeStatesQuerySpecification.instance());
-			for (RegionsOfCompositeStatesMatch regionsOfCompositeStateMatch : regionsOfCompositeStatesMatcher.getAllMatches()) {
-				if (regionsOfCompositeStateMatch.getSubregion() == region) {
-					return ((getEntryOfRegion(regionsOfCompositeStateMatch.getParentRegion()).getKind().getValue() == 2) || hasDeepHistoryAbove(regionsOfCompositeStateMatch.getParentRegion()));
-				}
+			for (RegionsOfCompositeStatesMatch regionsOfCompositeStateMatch : regionsOfCompositeStatesMatcher.getAllMatches(null, null, null, region)) {
+				return ((getEntryOfRegion(regionsOfCompositeStateMatch.getParentRegion()).getKind().getValue() == 2) || hasDeepHistoryAbove(regionsOfCompositeStateMatch.getParentRegion()));				
 			}
 			return false;
 		}
@@ -105,10 +104,8 @@ public class Helper {
 	 */
 	public static Entry getEntryOfRegion(Region region) throws IncQueryException {
 		EntryOfRegionsMatcher entryOfRegionsMatcher = engine.getMatcher(EntryOfRegionsQuerySpecification.instance());
-		for (EntryOfRegionsMatch entryOfRegionsMatch : entryOfRegionsMatcher.getAllMatches()) {
-			if (entryOfRegionsMatch.getRegion() == region) {
-				return entryOfRegionsMatch.getEntry();
-			}
+		for (EntryOfRegionsMatch entryOfRegionsMatch : entryOfRegionsMatcher.getAllMatches(null, region, null, null, null)) {
+			return entryOfRegionsMatch.getEntry();
 		}
 		return null;
 	}
@@ -122,7 +119,7 @@ public class Helper {
 	public static boolean isCompositeState(Vertex vertex) throws IncQueryException {
 		CompositeStatesMatcher compositeStatesMatcher = engine.getMatcher(CompositeStatesQuerySpecification.instance());
 		for (CompositeStatesMatch compositeStatesMatch : compositeStatesMatcher.getAllMatches()) {
-			if (compositeStatesMatch.getCompositeState() == vertex) {
+			if (vertex == compositeStatesMatch.getCompositeState()) {
 				return true;
 			}
 		}
@@ -136,13 +133,7 @@ public class Helper {
 	 * @throws IncQueryException
 	 */
 	public static boolean isChoice(Vertex vertex) throws IncQueryException {
-		ChoicesMatcher choicesMatcher = engine.getMatcher(ChoicesQuerySpecification.instance());
-		for (ChoicesMatch choicesMatch : choicesMatcher.getAllMatches()) {
-			if (choicesMatch.getChoice() == vertex) {
-				return true;
-			}
-		}
-		return false;
+		return (vertex instanceof Choice);
 	}
 	
 	/**
