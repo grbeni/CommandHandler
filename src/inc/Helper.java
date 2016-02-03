@@ -7,8 +7,6 @@ import inc.util.EventsQuerySpecification;
 import inc.util.FinalStatesQuerySpecification;
 import inc.util.RegionsOfCompositeStatesQuerySpecification;
 import inc.util.StatesQuerySpecification;
-import inc.util.StatesWithEntryEventQuerySpecification;
-import inc.util.StatesWithExitEventWithoutOutgoingTransitionQuerySpecification;
 import inc.util.TopRegionsQuerySpecification;
 import inc.util.VerticesOfRegionsQuerySpecification;
 
@@ -28,7 +26,8 @@ import org.yakindu.sct.model.sgraph.Transition;
 import org.yakindu.sct.model.sgraph.Vertex;
 
 /**
- * Egy helper osztály statikus metódusokkal.
+ * A Helper class with static methods.
+ * While the model traverser actually build the Uppaal model, this class only provides information about the Yakindu model and its elements.
  * @author Graics Bence
  *
  */
@@ -37,6 +36,11 @@ public class Helper {
 	private static IncQueryEngine engine;
 	private static RunOnceQueryEngine runOnceEngine;
 	
+	/**
+	 * Initialization.
+	 * @param engine
+	 * @param runOnceQueryEngine
+	 */
 	public static void setEngine(IncQueryEngine engine, RunOnceQueryEngine runOnceQueryEngine) {
 		Helper.engine = engine;
 		Helper.runOnceEngine = runOnceQueryEngine;		
@@ -51,13 +55,11 @@ public class Helper {
 	public static void addAllSubregionsToRegionList(State state, List<Region> regionList) throws IncQueryException {
 		RegionsOfCompositeStatesMatcher compositeStateMatcher = engine.getMatcher(RegionsOfCompositeStatesQuerySpecification.instance());
 		VerticesOfRegionsMatcher verticesOfRegionsMatcher = engine.getMatcher(VerticesOfRegionsQuerySpecification.instance());
-		for (RegionsOfCompositeStatesMatch regionsOfCompositeStateMatch : compositeStateMatcher.getAllMatches()) {
-			if (regionsOfCompositeStateMatch.getCompositeState() == state) {
-				regionList.add(regionsOfCompositeStateMatch.getSubregion());
-				for (VerticesOfRegionsMatch verticesOfRegionsMatch : verticesOfRegionsMatcher.getAllMatches()) {
-					if (verticesOfRegionsMatch.getRegion() == regionsOfCompositeStateMatch.getSubregion() && (isCompositeState(verticesOfRegionsMatch.getVertex()))) {
-						addAllSubregionsToRegionList((State) verticesOfRegionsMatch.getVertex(), regionList);
-					}
+		for (RegionsOfCompositeStatesMatch regionsOfCompositeStateMatch : compositeStateMatcher.getAllMatches(state, null, null, null)) {
+			regionList.add(regionsOfCompositeStateMatch.getSubregion());
+			for (VerticesOfRegionsMatch verticesOfRegionsMatch : verticesOfRegionsMatcher.getAllMatches(regionsOfCompositeStateMatch.getSubregion(), null)) {
+				if (isCompositeState(verticesOfRegionsMatch.getVertex())) {
+					addAllSubregionsToRegionList((State) verticesOfRegionsMatch.getVertex(), regionList);
 				}
 			}
 		}
