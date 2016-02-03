@@ -227,7 +227,6 @@ public class Helper {
 	public static boolean hasEntryEvent(Vertex state) throws IncQueryException {
 		for (StatesWithEntryEventMatch statesWithEntryEventMatch : runOnceEngine.getAllMatches(StatesWithEntryEventMatcher.querySpecification())) {
 			if (statesWithEntryEventMatch.getState() == state) {
-				System.out.println("Igaz");
 				return true;
 			}
 		}

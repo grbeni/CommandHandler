@@ -484,10 +484,11 @@ public class CommandHandler extends AbstractHandler {
 			Location stateEntryLocation = createEntryLocation(compositeStateMatch.getCompositeState(), compositeStateMatch.getParentRegion());
 			// Átállítjuk a bejövõ élek targetjét, ehhez felhasználjuk az összes élet lekérdezõ metódust
 			for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : sourceAndTargetOfTransitionsMatcher.getAllMatches(null, null, compositeStateMatch.getCompositeState())) {
-				if (!(transitionEdgeMap.containsKey(sourceAndTargetOfTransitionsMatch.getTransition()))) {
-					throw new Exception("The transition is not mapped: " + sourceAndTargetOfTransitionsMatch.getTransition());
+				if ((transitionEdgeMap.containsKey(sourceAndTargetOfTransitionsMatch.getTransition()))) {
+					//throw new Exception("The transition is not mapped: " + sourceAndTargetOfTransitionsMatch.getTransition().getSource().getName() + " -> " + sourceAndTargetOfTransitionsMatch.getTransition().getTarget().getName());
+					transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()).setTarget(stateEntryLocation);
 				}	
-				transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()).setTarget(stateEntryLocation);
+				
 			}
 		}
 	}
@@ -679,13 +680,11 @@ public class CommandHandler extends AbstractHandler {
 			}
 			// Ez az él felel majd meg a regionökön átívelõ transitionnek
 			transitionEdgeMap.put(transition, abstractionEdge);
-			// Ha a target composite state, akkor belépésre minden alrégiójába is belépünk
-			//if (Helper.isCompositeState(target)) {
-				List<Region> pickedSubregions = new ArrayList<Region>(((State) target).getRegions()); // Talán addAll kéne?
-				pickedSubregions.removeAll(visitedRegions);
-				setAllRegionsWithSync(true, pickedSubregions);		
-				setSyncFromGeneratedInit(pickedSubregions);
-			//}
+			// A target composite state, akkor belépésre minden alrégiójába is belépünk
+			List<Region> pickedSubregions = new ArrayList<Region>(((State) target).getRegions()); // Talán addAll kéne?
+			pickedSubregions.removeAll(visitedRegions);
+			setAllRegionsWithSync(true, pickedSubregions);		
+			setSyncFromGeneratedInit(pickedSubregions);
 		}	
 		// Ha nem a legfölsõ szinten vagyunk, akkor létrehozzuk a ? szinkronizációs éleket minden állapotból a megfelelõ állapotba
 		else {
@@ -703,7 +702,7 @@ public class CommandHandler extends AbstractHandler {
 					builder.setEdgeTarget(syncEdge, stateLocationMap.get(target));
 				}					
 				// Ha a targetnek van entryEventje, akkor azt rá kell írni az élre
-				if (Helper.hasEntryEvent(target) && !Helper.isCompositeState(target)/* && (lastLevel != Helper.getLevelOfVertex(target))*/) {
+				if (Helper.hasEntryEvent(target) && lastLevel != Helper.getLevelOfVertex(target)) {
 					for (StatesWithEntryEventMatch statesWithEntryEventMatch : runOnceEngine.getAllMatches(StatesWithEntryEventMatcher.querySpecification())) {
 						if (statesWithEntryEventMatch.getState() == target) {
 							String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
@@ -727,7 +726,7 @@ public class CommandHandler extends AbstractHandler {
 					builder.setEdgeTarget(syncEdge, stateLocationMap.get(target));
 				}	
 				
-				if (Helper.hasEntryEvent(target) && !Helper.isCompositeState(target)) {
+				if (Helper.hasEntryEvent(target) && lastLevel != Helper.getLevelOfVertex(target)) {
 					for (StatesWithEntryEventMatch statesWithEntryEventMatch : runOnceEngine.getAllMatches(StatesWithEntryEventMatcher.querySpecification())) {
 						if (statesWithEntryEventMatch.getState() == target) {
 							String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
