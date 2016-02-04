@@ -675,11 +675,8 @@ public class CommandHandler extends AbstractHandler {
 			setHelperEdgeEntryEvent(abstractionEdge, target, lastLevel);
 			// Ez az él felel majd meg a regionökön átívelõ transitionnek
 			transitionEdgeMap.put(transition, abstractionEdge);
-			// A target composite state, akkor belépésre minden alrégiójába is belépünk
-			List<Region> pickedSubregions = new ArrayList<Region>(((State) target).getRegions()); // Talán addAll kéne?
-			pickedSubregions.removeAll(visitedRegions);
-			setAllRegionsWithSync(true, pickedSubregions);		
-			setSyncFromGeneratedInit(pickedSubregions);
+			// A target composite state, belépésre minden alrégiójába is belépünk
+			setEdgeEntryAllSubregions(target, visitedRegions);
 		}	
 		// Ha nem a legfölsõ szinten vagyunk, akkor létrehozzuk a ? szinkronizációs éleket minden állapotból a megfelelõ állapotba
 		else {
@@ -694,10 +691,7 @@ public class CommandHandler extends AbstractHandler {
 			// Ha a target composite state, akkor ezt minden region-jére megismételjük, kivéve ezt a regiont
 			// Except if it is the last level: then we enter the state ordinarily
 			if (lastLevel != Helper.getLevelOfVertex(target) && Helper.isCompositeState(target)) {
-				List<Region> pickedSubregions = new ArrayList<Region>(((State) target).getRegions()); // Talán addAll kéne?
-				pickedSubregions.removeAll(visitedRegions);
-				setAllRegionsWithSync(true, pickedSubregions);		
-				setSyncFromGeneratedInit(pickedSubregions);
+				setEdgeEntryAllSubregions(target, visitedRegions);
 			}
 		}		
 	}
@@ -748,6 +742,13 @@ public class CommandHandler extends AbstractHandler {
 				}
 			}
 		}
+	}
+	
+	private void setEdgeEntryAllSubregions(Vertex target, List<Region> visitedRegions) throws Exception {		
+		List<Region> pickedSubregions = new ArrayList<Region>(((State) target).getRegions()); // Talán addAll kéne?
+		pickedSubregions.removeAll(visitedRegions);
+		setAllRegionsWithSync(true, pickedSubregions);		
+		setSyncFromGeneratedInit(pickedSubregions);
 	}
 	
 	/**
