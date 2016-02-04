@@ -786,14 +786,7 @@ public class CommandHandler extends AbstractHandler {
 			builder.setEdgeTarget(ownSyncEdge, stateLocationMap.get(target));
 			builder.setEdgeSync(ownSyncEdge, syncChanVar + (syncChanId), false);
 			// Exit eventet rárakjuk, ha van
-			if (Helper.hasExitEvent(source)) {
-				for (StatesWithExitEventWithoutOutgoingTransitionMatch statesWithExitEventMatch : runOnceEngine.getAllMatches(StatesWithExitEventWithoutOutgoingTransitionMatcher.querySpecification())) {
-					if (statesWithExitEventMatch.getState() == source) {
-						String effect = UppaalCodeGenerator.transformExpression(statesWithExitEventMatch.getExpression());
-						builder.setEdgeUpdate(ownSyncEdge, effect);						
-					}
-				}
-			}
+			setHelperEdgeExitEvent(ownSyncEdge, source, lastLevel);
 			// Itt letiltjuk az összes source alatt lévõ régiót, jelezve, hogy azok már nem érvényesek
 			// Kivéve a meglátogatottakat
 			List<Region> subregionList = new ArrayList<Region>();
@@ -811,15 +804,19 @@ public class CommandHandler extends AbstractHandler {
 			builder.setEdgeTarget(ownSyncEdge, stateLocationMap.get(source));
 			builder.setEdgeSync(ownSyncEdge, syncChanVar + (syncChanId), false);
 			builder.setEdgeUpdate(ownSyncEdge, isActiveVar + " = false");
-			if (Helper.hasExitEvent(source)) {
-				for (StatesWithExitEventWithoutOutgoingTransitionMatch statesWithExitEventMatch : runOnceEngine.getAllMatches(StatesWithExitEventWithoutOutgoingTransitionMatcher.querySpecification())) {
-					if (statesWithExitEventMatch.getState() == source) {
-						String effect = UppaalCodeGenerator.transformExpression(statesWithExitEventMatch.getExpression());
-						builder.setEdgeUpdate(ownSyncEdge, effect);						
-					}
+			setHelperEdgeExitEvent(ownSyncEdge, source, lastLevel);
+			createEdgesWhenSourceGreater((Vertex) source.getParentRegion().getComposite(), target, transition, lastLevel, visitedRegions);
+		}
+	}
+	
+	private void setHelperEdgeExitEvent(Edge edge, Vertex source, int lastLevel) throws IncQueryException {
+		if (Helper.hasExitEvent(source)) {
+			for (StatesWithExitEventWithoutOutgoingTransitionMatch statesWithExitEventMatch : runOnceEngine.getAllMatches(StatesWithExitEventWithoutOutgoingTransitionMatcher.querySpecification())) {
+				if (statesWithExitEventMatch.getState() == source) {
+					String effect = UppaalCodeGenerator.transformExpression(statesWithExitEventMatch.getExpression());
+					builder.setEdgeUpdate(edge, effect);						
 				}
 			}
-			createEdgesWhenSourceGreater((Vertex) source.getParentRegion().getComposite(), target, transition, lastLevel, visitedRegions);
 		}
 	}
 	
