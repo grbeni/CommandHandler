@@ -789,11 +789,7 @@ public class CommandHandler extends AbstractHandler {
 			setHelperEdgeExitEvent(ownSyncEdge, source, lastLevel);
 			// Itt letiltjuk az összes source alatt lévõ régiót, jelezve, hogy azok már nem érvényesek
 			// Kivéve a meglátogatottakat
-			List<Region> subregionList = new ArrayList<Region>();
-			State sourceState = (State) source;
-			Helper.addAllSubregionsToRegionList(sourceState, subregionList);
-			subregionList.removeAll(visitedRegions);
-			setAllRegionsWithSync(false, subregionList);
+			setEdgeExitAllSubregions(source, visitedRegions);
 			return;
 		}
 		// Közbülsõ szinteken csak kézzel létrehozzuk a sync éleket, letiltjuk a régiót, és rájuk írjuk az exit expressiont, ha van
@@ -818,6 +814,14 @@ public class CommandHandler extends AbstractHandler {
 				}
 			}
 		}
+	}
+	
+	private void setEdgeExitAllSubregions(Vertex source, List<Region> regionsToRemove) throws Exception {
+		List<Region> subregionList = new ArrayList<Region>();
+		State sourceState = (State) source ;
+		Helper.addAllSubregionsToRegionList(sourceState, subregionList);
+		subregionList.removeAll(regionsToRemove);
+		setAllRegionsWithSync(false, subregionList);
 	}
 	
 	/**
