@@ -672,14 +672,7 @@ public class CommandHandler extends AbstractHandler {
 			builder.setEdgeSync(abstractionEdge, syncChanVar + (syncChanId), true);
 			builder.setEdgeComment(abstractionEdge, "A Yakinduban alacsonyabb absztrakcios szinten levo vertexbe vezeto el.");
 			// Ha a targetnek van entryEventje, akkor azt rá kell írni az élre
-			if (Helper.hasEntryEvent(target)) {
-				for (StatesWithEntryEventMatch statesWithEntryEventMatch : runOnceEngine.getAllMatches(StatesWithEntryEventMatcher.querySpecification())) {
-					if (statesWithEntryEventMatch.getState() == target) {
-						String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
-						builder.setEdgeUpdate(abstractionEdge, effect);
-					}
-				}
-			}
+			setHelperEdgeEntryEvent(abstractionEdge, target, lastLevel);
 			// Ez az él felel majd meg a regionökön átívelõ transitionnek
 			transitionEdgeMap.put(transition, abstractionEdge);
 			// A target composite state, akkor belépésre minden alrégiójába is belépünk
@@ -692,53 +685,11 @@ public class CommandHandler extends AbstractHandler {
 		else {
 			VerticesOfRegionsMatcher verticesOfRegionsMatcher = engine.getMatcher(VerticesOfRegionsQuerySpecification.instance());
 			for (VerticesOfRegionsMatch verticesOfRegionsMatch : verticesOfRegionsMatcher.getAllMatches(target.getParentRegion(), null)) {				
-				Edge syncEdge = builder.createEdge(regionTemplateMap.get(verticesOfRegionsMatch.getRegion()));					
-				builder.setEdgeSource(syncEdge, stateLocationMap.get(verticesOfRegionsMatch.getVertex()));
-				
-				// Ha utolsó szinten vagyunk, és egy composite state-be megyünk, akkor az entryLocjába kell kötni
-				if (lastLevel == Helper.getLevelOfVertex(target) && hasEntryLoc.containsKey(target)) {
-					builder.setEdgeTarget(syncEdge, builder.getEdgeSource(hasEntryLoc.get(target)));
-				}							
-				// Itt már nem kell entryLocba kötni, mert az lehet, hogy elrontaná az alsóbb régiók helyes állapotatit (tehát csak legalsó szinten kell entryLocba kötni)
-				else {					
-					builder.setEdgeTarget(syncEdge, stateLocationMap.get(target));
-				}					
-				// Ha a targetnek van entryEventje, akkor azt rá kell írni az élre
-				if (Helper.hasEntryEvent(target) && lastLevel != Helper.getLevelOfVertex(target)) {
-					for (StatesWithEntryEventMatch statesWithEntryEventMatch : runOnceEngine.getAllMatches(StatesWithEntryEventMatcher.querySpecification())) {
-						if (statesWithEntryEventMatch.getState() == target) {
-							String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
-							builder.setEdgeUpdate(syncEdge, effect);
-						}
-					}
-				}
-				builder.setEdgeSync(syncEdge, syncChanVar + (syncChanId), false);
-				builder.setEdgeUpdate(syncEdge, isActiveVar + " = true");				
+				setHelperEdges(stateLocationMap.get(verticesOfRegionsMatch.getVertex()), target, lastLevel);
 			}
 			// Altemplate "initial location"-jét is bekötjük a megfelelõ locationbe
 			if (hasInitLoc.containsKey(regionTemplateMap.get(target.getParentRegion()))) {
-				Edge syncEdge = builder.createEdge(regionTemplateMap.get(target.getParentRegion()));
-				builder.setEdgeSource(syncEdge, hasInitLoc.get(regionTemplateMap.get(target.getParentRegion())));
-				// Ha utolsó szinten vagyunk, és egy composite state-be megyünk, akkor az entryLocjába kell kötni
-				if (lastLevel == Helper.getLevelOfVertex(target) && hasEntryLoc.containsKey(target)) {
-					builder.setEdgeTarget(syncEdge, builder.getEdgeSource(hasEntryLoc.get(target)));
-				}							
-				// Itt már nem kell entryLocba kötni, mert az lehet, hogy elrontaná az alsóbb régiók helyes állapotait (tehát csak legalsó szinten kell entryLocba kötni)
-				else {					
-					builder.setEdgeTarget(syncEdge, stateLocationMap.get(target));
-				}	
-				
-				if (Helper.hasEntryEvent(target) && lastLevel != Helper.getLevelOfVertex(target)) {
-					for (StatesWithEntryEventMatch statesWithEntryEventMatch : runOnceEngine.getAllMatches(StatesWithEntryEventMatcher.querySpecification())) {
-						if (statesWithEntryEventMatch.getState() == target) {
-							String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
-							builder.setEdgeUpdate(syncEdge, effect);
-						}
-					}
-				}
-				
-				builder.setEdgeSync(syncEdge, syncChanVar + (syncChanId), false);
-				builder.setEdgeUpdate(syncEdge, isActiveVar + " = true");	
+				setHelperEdges(hasInitLoc.get(regionTemplateMap.get(target.getParentRegion())), target, lastLevel);				
 			}
 			// Ha a target composite state, akkor ezt minden region-jére megismételjük, kivéve ezt a regiont
 			// Except if it is the last level: then we enter the state ordinarily
@@ -767,6 +718,34 @@ public class CommandHandler extends AbstractHandler {
 				builder.setEdgeTarget(fromGeneratedInit, stateLocationMap.get(Helper.getEntryOfRegion(subregion)));
 				builder.setEdgeSync(fromGeneratedInit, syncChanVar + syncChanId, false);
 				builder.setEdgeUpdate(fromGeneratedInit, isActiveVar + " = true");
+			}
+		}
+	}
+	
+	private void setHelperEdges(Location source, Vertex target, int lastLevel) throws IncQueryException {
+		Edge syncEdge = builder.createEdge(source.getParentTemplate());					
+		builder.setEdgeSource(syncEdge, source);		
+		// Ha utolsó szinten vagyunk, és egy composite state-be megyünk, akkor az entryLocjába kell kötni
+		if (lastLevel == Helper.getLevelOfVertex(target) && hasEntryLoc.containsKey(target)) {
+			builder.setEdgeTarget(syncEdge, builder.getEdgeSource(hasEntryLoc.get(target)));
+		}							
+		// Itt már nem kell entryLocba kötni, mert az lehet, hogy elrontaná az alsóbb régiók helyes állapotatit (tehát csak legalsó szinten kell entryLocba kötni)
+		else {					
+			builder.setEdgeTarget(syncEdge, stateLocationMap.get(target));
+		}					
+		// Ha a targetnek van entryEventje, akkor azt rá kell írni az élre
+		setHelperEdgeEntryEvent(syncEdge, target, lastLevel);
+		builder.setEdgeSync(syncEdge, syncChanVar + (syncChanId), false);
+		builder.setEdgeUpdate(syncEdge, isActiveVar + " = true");
+	}
+	
+	private void setHelperEdgeEntryEvent(Edge edge, Vertex target, int lastLevel) throws IncQueryException {
+		if (Helper.hasEntryEvent(target) && lastLevel != Helper.getLevelOfVertex(target)) {
+			for (StatesWithEntryEventMatch statesWithEntryEventMatch : runOnceEngine.getAllMatches(StatesWithEntryEventMatcher.querySpecification())) {
+				if (statesWithEntryEventMatch.getState() == target) {
+					String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
+					builder.setEdgeUpdate(edge, effect);
+				}
 			}
 		}
 	}

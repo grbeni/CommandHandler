@@ -1,6 +1,5 @@
 package inc;
 
-import inc.util.ChoicesQuerySpecification;
 import inc.util.CompositeStatesQuerySpecification;
 import inc.util.EntryOfRegionsQuerySpecification;
 import inc.util.EventsQuerySpecification;
