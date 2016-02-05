@@ -47,9 +47,9 @@ public class Helper {
 	}
 	
 	/**
-	 * Ez a metódus paramétersoron visszaadja a megadott state összes alatta lévõ region-jét. (Nem csak az eggyel alatta lévõket.)
-	 * @param state Yakindu composite state, amelynek az összes alatta lévõ regionje kell.
-	 * @param regionList Ebbe a listába fogja betenni a metódus a regionöket.
+	 * This method returns in parameter variable all the subregions and the subregions of the composite states of subregions recursively of the given state. 
+	 * @param state Yakindu composite state whose all subregions are needed
+	 * @param regionList Should be an empty list. This list will contain all the subregions at the end of the call.
 	 * @throws IncQueryException 
 	 */
 	public static void addAllSubregionsToRegionList(State state, List<Region> regionList) throws IncQueryException {
@@ -66,9 +66,9 @@ public class Helper {
 	}	
 	
 	/**
-	 * Visszaadja, hogy található-e a regionben vagy felette deep history indicator.
-	 * @param region Yakindu region, amely felett keressük a deep history indicatort.
-	 * @return Van-e a regionben, vagy felette deep history indicator. 
+	 * Returns whether there is a deep history in or above the given region
+	 * @param region Yakindu region
+	 * @return
 	 * @throws IncQueryException 
 	 */
 	private static boolean hasDeepHistoryAbove(Region region) throws IncQueryException {
@@ -85,9 +85,9 @@ public class Helper {
 	}
 	
 	/**
-	 * Ez a metódus megmondja, hogy a megadott regionnek, van-e historyja.
-	 * @param region A Yakindu region, amelyrõl el szeretnénk döntenti, hogy van-e historyja.
-	 * @return Van-e a regionnek historyja.
+	 * This method returns whether the given region has history.
+	 * @param region A Yakindu
+	 * @return
 	 * @throws IncQueryException
 	 */
 	public static boolean hasHistory(Region region) throws IncQueryException {
@@ -95,10 +95,10 @@ public class Helper {
 	}
 	
 	/**
-	 * Ez a metódus visszaadja egy adott region entry elemét.
-	 * Feltételezi, hogy csak egy ilyen van egy region-ben. (Különben a Yakindu modell hibás.)
-	 * @param region A Yakindu region, amelyben keressük az entry.
-	 * @return A Yakindu entry elem.
+	 * This method returns the entry node of the region.
+	 * Assumes there is only one in each region (Otherwise the Yakindu model is not sound.)
+	 * @param region Yakindu region
+	 * @return Entry node
 	 * @throws IncQueryException 
 	 */
 	public static Entry getEntryOfRegion(Region region) throws IncQueryException {
@@ -110,9 +110,9 @@ public class Helper {
 	}
 	
 	/**
-	 * Ez a metódus eldönti, hogy a megadott Yakindu vertex composite state-e.
-	 * @param vertex Yakindu vertex, amelyrõl el szeretnénk dönteni, hogy composite state-e.
-	 * @return Composite state-e vagy nem.
+	 * This method returns whether the given vertex is a composite state.
+	 * @param vertex Yakindu vertex
+	 * @return
 	 * @throws IncQueryException
 	 */
 	public static boolean isCompositeState(Vertex vertex) throws IncQueryException {
@@ -126,9 +126,9 @@ public class Helper {
 	}
 	
 	/**
-	 * Ez a metódus eldönti, hogy a megadott Yakindu vertex choice-e.
-	 * @param vertex Yakindu vertex, amelyrõl el szeretnénk dönteni, hogy choice-e.
-	 * @return Choice-e vagy nem.
+	 * This method returns whether the given vertex is a choice.
+	 * @param vertex Yakindu vertex
+	 * @return
 	 * @throws IncQueryException
 	 */
 	public static boolean isChoice(Vertex vertex) throws IncQueryException {
@@ -136,9 +136,9 @@ public class Helper {
 	}
 	
 	/**
-	 * Ez a metódus eldönti, hogy a megadott Yakindu vertex entry-e.
-	 * @param vertex Yakindu vertex, amelyrõl el szeretnénk dönteni, hogy entry-e.
-	 * @return Entry-e vagy nem.
+	 * This method returns whether the given vertex is an entry.
+	 * @param vertex Yakindu vertex
+	 * @return
 	 * @throws IncQueryException
 	 */
 	public static boolean isEntry(Vertex vertex) throws IncQueryException {
@@ -146,9 +146,9 @@ public class Helper {
 	}
 	
 	/**
-	 * Ez a metódus eldönti, hogy a megadott Yakindu region legfelsõ szintû-e.
-	 * @param region Yakindu region, amelyrõl el szeretnénk dönteni, hogy top szintû-e.
-	 * @return Top szintû-e vagy nem.
+	 * This method returns whether the given region is top region.
+	 * @param region Yakindu region
+	 * @return
 	 * @throws IncQueryException
 	 */
 	public static boolean isTopRegion(Region region) throws IncQueryException {
@@ -160,10 +160,10 @@ public class Helper {
 	}
 	
 	/**
-	 * Visszaadja, hogy egy vertex elem milyen messze található a legfölsõ regiontõl.
-	 * (Ha a legfölsõ regionben található, akkor ez az érték 0.)
-	 * @param vertex A Yakindu vertex, amelynek lekérjük a szintjét.
-	 * @return A szint mint egész szám.
+	 * Returns the distance of the given vertex of the top region.
+	 * (If the vertex is in the top region, the distance is 0.)
+	 * @param vertex A Yakindu vertex whose level we want.
+	 * @return An integer number as level.
 	 * @throws IncQueryException 
 	 */
 	public static int getLevelOfVertex(Vertex vertex) throws IncQueryException {
@@ -183,10 +183,10 @@ public class Helper {
 	}
 	
 	/**
-	 * Visszaadja a regiont, és a felette lévõ faszerkezetben elhelyezkedõ regionöket.
-	 * @param regionList Eleinte üres lista, amelyben tárolni fogja a regionöket.
-	 * @param region Ettõl a Yakindu region-tõl kezde indulunk el felfelé, és tároljuk el a regionöket.
-	 * @return Egy lista a faszerkezetben lévõ regionökrõl
+	 * Returns the region and the regions above it until the top region. (Recursion.)
+	 * @param regionList Initially empty list that will contain all the regions at the end of the call.
+	 * @param region The initial region
+	 * @return A list of regions.
 	 */
 	public static List<Region> getThisAndUpperRegions(List<Region> regionList, Region region) {
 		regionList.add(region);
@@ -199,9 +199,9 @@ public class Helper {
 	}
 	
 	/**
-	 * Ez a metódus eldönti, hogy a megadott Yakindu vertexnek van-e entry eventje.
-	 * @param state Yakindu vertex, amelyrõl el szeretnénk dönteni, van-e entry eventje.
-	 * @return Van-e entry eventje vagy nem.
+	 * This method returns whether the given vertex has entry event. (States can have entry events.)
+	 * @param state Yakindu vertex
+	 * @return
 	 * @throws IncQueryException
 	 */
 	public static boolean hasEntryEvent(Vertex state) throws IncQueryException {
@@ -214,9 +214,9 @@ public class Helper {
 	}
 	
 	/**
-	 * Ez a metódus eldönti, hogy a megadott Yakindu vertexnek van-e exit eventje.
-	 * @param state Yakindu vertex, amelyrõl el szeretnénk dönteni, van-e exit eventje.
-	 * @return Van-e exit eventje vagy nem.
+	 * This method returns whether the given vertex has exit event. (States can have exit events.)
+	 * @param state Yakindu vertex
+	 * @return
 	 * @throws IncQueryException
 	 */
 	public static boolean hasExitEvent(Vertex state) throws IncQueryException {
@@ -229,8 +229,8 @@ public class Helper {
 	}
 	
 	/**
-	 * Ez a metódus eldönti, hogy van-e final state a Yakindu modellben.
-	 * @return Talált-e final state-et vagy nem.
+	 * This method returns whether the Yakindu model has final state-
+	 * @return
 	 * @throws IncQueryException
 	 */
 	public static boolean hasFinalState() throws IncQueryException {

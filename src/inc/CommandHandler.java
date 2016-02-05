@@ -86,37 +86,38 @@ public class CommandHandler extends AbstractHandler {
 	private IncQueryEngine engine;
 	private RunOnceQueryEngine runOnceEngine;
 	 
-	// Uppaal változónevek
+	// Uppaal variable namse
 	private final String syncChanVar = "syncChan";
 	private final String isActiveVar = "isActive";
 	private final String clockVar = "Timer";
 	private final String endVar = "end";
 			
-	// Az UPPAAL modell felépítésre
+	// For the building of the Uppaal model
 	private UppaalModelBuilder builder = null;	
 			
-	// Egy Map a Yakindu:Region -> UPPAAL:Template leképzésre									 								
+	// A Map for Yakindu:Region -> UPPAAL:Template mapping									 								
 	private Map<Region, Template> regionTemplateMap = null;
 			
-	// Egy Map a Yakindu:Vertex -> UPPAAL:Location leképzésre									 								
+	// A Map for Yakindu:Vertex -> UPPAAL:Location mapping									 								
 	private Map<Vertex, Location> stateLocationMap = null;
 			
-	// Egy Map a Yakindu:Transition -> UPPAAL:Edge leképzésre
+	// A Map for Yakindu:Transition -> UPPAAL:Edge mapping
 	private Map<Transition, Edge> transitionEdgeMap = null;
 			
-	// Egy Map a Yakindu:Vertex -> UPPAAL:Edge leképzésre
-	// Az entryLocation-nel rendelkezõ vertex Uppaal megfelelõ locationjébe vezetõ élet adja vissza
+	// A Map for Yakindu:Vertex -> UPPAAL:Edge mapping
+	// Returns the Uppaal edge going to the location equivalent of the Yakindu vertex going from the entryLocation
+	// (Entry event or composite states.)
 	private Map<Vertex, Edge> hasEntryLoc = null;
-	
-	// Egy Map, amely tárolja az egyes Vertexek triggerLocation kimenõ élét
+
+	// A Map containg the outgoing edge of the trigger location
 	private Map<Transition, Edge> hasTriggerPlusEdge = null;
 	
-	// Egy Map, amely tárolja az altemplate-ek "initial location"-jét
+	// A Map containg the generated init location of a template
 	private Map<Template, Location> hasInitLoc = null;
 			
-	// Szinkronizációs csatornák létrehozására
+	// For the generation of sync channels
 	private int syncChanId = 0;
-	// EntryLoc név generálásra
+	// For the generation of entry locations
 	private int entryStateId = 0;
 	// For the generation of raising locations
 	private int raiseId = 0;
@@ -151,11 +152,11 @@ public class CommandHandler extends AbstractHandler {
 								Helper.setEngine(engine, runOnceEngine);
 								
 								try {
-									// UPPAAL modell inicializáció
+									// UPPAAL model initialization
 									builder = UppaalModelBuilder.getInstance();
 									builder.createNTA(statechart.getName());
 									
-									// Map-ek inicializálása
+									// Map initialization
 									regionTemplateMap = new HashMap<Region, Template>();									 								
 									stateLocationMap = new HashMap<Vertex, Location>();
 									transitionEdgeMap = new HashMap<Transition, Edge>();
@@ -163,38 +164,38 @@ public class CommandHandler extends AbstractHandler {
 									hasTriggerPlusEdge = new HashMap<Transition, Edge>();
 									hasInitLoc = new HashMap<Template, Location>();
 									
-									// ID változók resetelése
+									// ID variables reset
 									syncChanId = 0;
 									entryStateId = 0;
 									raiseId = 0;
 									
-									// Csak akkor szennyezzük az Uppaal modellt end változóval, ha van final state a Yakindu modellben
+									// We only add end variable if there is a final state in the Yakindu model
 									if (Helper.hasFinalState()) {
 										builder.addGlobalDeclaration("bool " + endVar + " = false;" );
 									}
 									
-									// Változók berakása
+									// Creation of integer and boolean variables 
 									createVariables();
 									
-									// Template-ek létrehozása
+									// Creation of templates from regions 
 									createTemplates();	
 									
-									// Triggerek felvétele
-									createControlTemplate();
-																											
-									// Felépíti az UPPAAL modellt a berakott elemekbõl
+									// Creating the control template so we can trigger in events (with values)
+									createControlTemplate();																											
+									
+									// Builds the Uppaal model from the elements added above
 									builder.buildModel();
 
-									// Létrehozza a SampleRefelcetiveEcoreEditorral megnyitható UPPAAL modellt
+									// Crates an Uppaal model editable by SampleRefelcetiveEcoreEditor
 									builder.saveUppaalModel(fileURISubstring);									
 									
 									String filen = UppaalModelSaver.removeFileExtension(fileURISubstring);									
-									// Elmenti a modellt egy XML fájlba, lényegében létrehozza az UPPAAL által megnyitható fájlt
+									// Saves the model to an XML file editable by Uppaal
 									UppaalModelSerializer.saveToXML(filen);
-									// Létrehozza a q file-t
+									// Creates the q file-t
 									UppaalQueryGenerator.saveToQ(filen);
 									
-									// Reseteli a buildert, hogy a következõ transzformációt nulláról kezdhessük
+									// Resets the builder, so the next transformation begins with an empty model
 									builder.reset();
 
 								} catch (IncQueryException e) {
@@ -213,11 +214,11 @@ public class CommandHandler extends AbstractHandler {
 	}	
 
 	/**
-	 * Ez a metódus létrehozza az UPPAAL változókat a Yakindu változók alapján.
+	 * This method creates Uppaal global variables based on Yakindu internal and interface variables
+	 * Only handles integer and boolean types.
 	 * @throws IncQueryException
 	 */
 	private void createVariables() throws IncQueryException {
-		// Lekérjük a változó definiciókat
 		VariableDefinitionsMatcher variableDefinitionsMatcher = engine.getMatcher(VariableDefinitionsQuerySpecification.instance());
 		Collection<VariableDefinitionsMatch> allVariableDefinitions = variableDefinitionsMatcher.getAllMatches();
 		System.out.println("Number of variables: " + allVariableDefinitions.size());
@@ -244,79 +245,75 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
-	 * Ez a metódus létrehozza az egyes UPPAAL template-eket a Yakindu regionök alapján.
+	 * This method creates Uppaal templates based on Yakindu regions.
 	 * @throws Exception 
 	 */
 	private void createTemplates() throws Exception {
-		// Lekérjük a régiókat
 		EntryOfRegionsMatcher entryOfRegionsMatcher = engine.getMatcher(EntryOfRegionsQuerySpecification.instance());
-		Collection<EntryOfRegionsMatch> regionMatches = entryOfRegionsMatcher.getAllMatches();
-		// Végigmegyünk a régiókon, és létrehozzuk a Yakindu modellnek megfeleltethetõ elemeket.
-		for (EntryOfRegionsMatch regionMatch : regionMatches) {
-			Template template = builder.createTemplate(Helper.getTemplateNameFromRegionName(regionMatch.getRegion()));			
-			// Kiszedjük a template nevekbõl a szóközöket, mert az UPPAAL nem szereti
+		// Iterating through regions, and creating the Uppaal elements "matching" the Yakindu elements.
+		for (EntryOfRegionsMatch regionMatch : entryOfRegionsMatcher.getAllMatches()) {
+			Template template = builder.createTemplate(Helper.getTemplateNameFromRegionName(regionMatch.getRegion())); // We name the templates
+			// Setting the activity variables of templates
 			if (Helper.isTopRegion(regionMatch.getRegion())) {
-				// Mégis foglalkozunk, hogy a regionökön átívelõ tranziciók helyes lefutása garantálható legyen
 				builder.addLocalDeclaration("bool " + isActiveVar + " = true;", template);
 			} 
 			else {
-				// Az alsóbb szinteken kezdetben false érvényességi változót vezetünk be
 				builder.addLocalDeclaration("bool " + isActiveVar + " = false;", template);
 			}			
-			// Beteszünk egy clockot
+			// Creating a clock for each template
 			builder.addLocalDeclaration("clock " + clockVar + ";", template);
 			
-			// A region-template párokat berakjuk a Mapbe
+			// The region-template pairs are put into the Map
 			regionTemplateMap.put(regionMatch.getRegion(), template);
 										   									
-			//Kiinduló állapotot beállítjuk									 
+			// Setting the initial locations (this will change, if the template is not top region equivalent)						 
 			Location entryLocation = builder.createLocation(regionMatch.getEntry().getKind().getName(), template);
 			builder.setInitialLocation(entryLocation, template);
-			// Az entry node committed
+			// The entry node is committed
 			builder.setLocationCommitted(entryLocation);
 			builder.setLocationComment(entryLocation, "Initial entry node");
 	
-			//Betesszük a kezdõállapotot a Map-be									 
+			// Putting the entry into the map								 
 			stateLocationMap.put(regionMatch.getEntry(), entryLocation);
 		
-			// Létrehozzuk a location-öket a state-ekbõl
+			// Creating locations from states
 			createLocationsFromStates(regionMatch.getRegion(), template);
 			
-			// Létrehozzuk a location-öket a choice-okból
+			// Creating locations from choices
 			createLocationsFromChoices(regionMatch.getRegion(), template);
 			
-			// Létrehozzuk a location-öket a final state-ekbõl
+			// Creating locations from final states
 			createLocationsFromFinalStates(regionMatch.getRegion(), template);
 			
-			// Létrehozzuk a location-öket az exit node-okbõl
+			// Creating locations from exit nodes
 			createLocationsFromExitNodes(regionMatch.getRegion(), template);			
 			
-			// Létrehozzuk az edge-eket a transition-ökbõl																			
+			// Creating edges from same region transitions																		
 			createEdges(regionMatch.getRegion(), template);			
 		}	
 		
-		// Final state bemenõ edge-einek updateinek megadása
+		// Setting the updates of incoming edges of final states
 		createFinalStateEdgeUpdates();
 		
-		// Exit node-ok syncjeinek létrehozása
+		// Creating the synchronizations of exit nodes
 		createUpdatesForExitNodes();
 		
-		// Composite állapotok entry statejének létrehozása
+		// Creating entry location for each composite state
 		createEntryForCompositeStates();
 		
-		// Beállítjuk a composite state-ek entry transitionjeit, hogy minden bemenetkor minden alrégió helyes állapotba kerüljön (kezdõállapot/önmaga, true)
+		// Setting the entry edges of composite states, so every time we enter the state ordinarily (from the same template), all the subtemplates are set properly (isActive = true)
 		createEntryEdgesForAbstractionLevels();
 		
-		// Beállítjuk a composite state-ek exit transitionjeit, hogy minden kimenetkor minden alrégió helyes állapotba kerüljön (false)
+		// Setting the exit edges of composite states, so every time we leave the state ordinarily (to the same template), all the subtemplates are set properly (isActive = false)
 		createExitEdgesForAbstractionLevels();
 		
-		// Beállítjuk azon csatornákat, amelyek különbözõ absztakciós szintek közötti tranziciókat vezérlik
+		// Setting the not ordinary (across templates) synchronizations.
 		createEdgesForDifferentAbstraction();
 
-		// Edge effectek berakása
+		// Creating edge effects
 		setEdgeUpdates();
 		
-		// Edge guardok berakása
+		// Creating edge guards
 		setEdgeGuards();		
 		
 		// Create events as broadcast channels
@@ -325,14 +322,14 @@ public class CommandHandler extends AbstractHandler {
 		// Create loop edges + raising locations as local reactions
 		createLocalReactions();
 		
-		// Template guardok berakása
+		// Creating template guards on every edge: isActive
 		createTemplateValidityGuards();
 		
 		// Entry kimenõ élek beSyncelése
 		// Sajnos nem mûködik ebben a forméban, hogy egyszerre jöjjenek ki az entry node-ból :(
 		//createSyncFromEntries();
 		
-		// After .. kifejezések transzformálása
+		// Transforming after .. expression
 		createTimingEvents();
 	}
 	
