@@ -334,18 +334,16 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
-	 * Ez a metódus létrehozza az UPPAAL locationöket a Yakindu state-ek alapján a StatesMatcheket felhasználva.
-	 * @param region A Yakindu region, amelybõl a state-ek valók.
-	 * @param template Az UPPAAL template, amelybe a locationöket kell rakni.
+	 * This method creates Uppaal locations based on Yakindu states.
+	 * @param region Yakindu region whose states we want to process
+	 * @param template Uppaal template this method puts the locations into
 	 * @throws IncQueryException
 	 */
 	private void createLocationsFromStates(Region region, Template template) throws IncQueryException {
-		// Lekérjük az állapotokat
 		StatesMatcher statesMatcher = engine.getMatcher(StatesQuerySpecification.instance());
-		// Megnézzük a state matcheket és létrehozzuk a location-öket
 		for (StatesMatch stateMatch : statesMatcher.getAllMatches(null, region, null)) {												
 			Location aLocation = builder.createLocation(stateMatch.getName(), template);
-			stateLocationMap.put(stateMatch.getState(), aLocation); // A state-location párokat betesszük a map-be	
+			stateLocationMap.put(stateMatch.getState(), aLocation); // Putting the state-location pairs into the map
 			if (Helper.isCompositeState(stateMatch.getState())) {
 				builder.setLocationComment(aLocation, "Composite state");
 			}
@@ -356,46 +354,42 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
-	 * Ez a metódus létrehozza az UPPAAL locationöket a Yakindu choice-ok alapján a ChoiceMatcheket felhasználva.
-	 * @param region A Yakindu region, amelybõl a choice-ok valók.
-	 * @param template Az UPPAAL template, amelybe a locationöket kell rakni.
+	 * This method creates Uppaal (committed) locations based on Yakindu choices.
+	 * @param region Yakindu region whose choices we want to process
+	 * @param template Uppaal template this method puts the locations into
 	 * @throws IncQueryException
 	 */
 	private void createLocationsFromChoices(Region region, Template template) throws IncQueryException {
-		// A különbözõ choice-ok megkülönböztetésére
+		// To guarantee unique names
 		int id = 0; 
-		// Lekérjük a choice-okat
 		ChoicesMatcher choicesMatcher = engine.getMatcher(ChoicesQuerySpecification.instance());
-		// Megnézzük a choice matcheket és létrehozzuk a location-öket		
 		for (ChoicesMatch choiceMatch : choicesMatcher.getAllMatches(null, region)) {				
 			Location aLocation = builder.createLocation("Choice" + id++, template);
 			builder.setLocationCommitted(aLocation);
-			stateLocationMap.put(choiceMatch.getChoice(), aLocation); // A choice-location párokat betesszük a map-be	
+			stateLocationMap.put(choiceMatch.getChoice(), aLocation); // Putting the choice-location pairs into the map	
 			builder.setLocationComment(aLocation, "A choice");
 		}
 	}
 	
 	/**
-	 * Ez a metódus létrehozza az UPPAAL locationöket a Yakindu final state-ek alapján a FinalStatesMatcheket felhasználva.
-	 * @param region A Yakindu region, amelybõl a final state-ek valók.
-	 * @param template Az UPPAAL template, amelybe a locationöket kell rakni.
+	 * This method creates Uppaal locations based on Yakindu final states.
+	 * @param region Yakindu region whose final states we want to process
+	 * @param template Uppaal template this method puts the locations into
 	 * @throws IncQueryException
 	 */
 	private void createLocationsFromFinalStates(Region region, Template template) throws IncQueryException {
-		// A különbözõ final state-ek megkülönböztetésére
+		// To guarantee unique names
 		int id = 0; 
-		// Lekérjük a final state-eket
 		FinalStatesMatcher finalStatesMatcher = engine.getMatcher(FinalStatesQuerySpecification.instance());
-		// Megnézzük a state matcheket és létrehozzuk a location-öket		
 		for (FinalStatesMatch finalStateMatch : finalStatesMatcher.getAllMatches(null, region)) {										
 			Location aLocation = builder.createLocation("FinalState" + id++, template);
-			stateLocationMap.put(finalStateMatch.getFinalState(), aLocation); // A final state-location párokat betesszük a map-be	
+			stateLocationMap.put(finalStateMatch.getFinalState(), aLocation); // Putting the  final state-location pairs into the map		
 			builder.setLocationComment(aLocation, "A final state");
 		}
 	}
 	
 	/**
-	 * Ez a metódus létrehozza a final state bemenõ élén az end = false update-eket, ami letilt minden tranziciót.
+	 * This method creates end = false update on each incoming edge of the final state locations.
 	 * @throws IncQueryException
 	 */
 	private void createFinalStateEdgeUpdates() throws IncQueryException {
@@ -406,83 +400,71 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
-	 * Ez a metódus létrehozza az UPPAAL locationöket a Yakindu exit node-ok alapján az ExitNodesMatcheket felhasználva.
-	 * @param region A Yakindu region, amelybõl a final state-ek valók.
-	 * @param template Az UPPAAL template, amelybe a locationöket kell rakni
+	 * This method creates Uppaal locations based on Yakindu exit nodes.
+	 * @param region Yakindu region whose final states we want to process
+	 * @param template Uppaal template this method puts the locations into
 	 * @throws IncQueryException
 	 */
 	private void createLocationsFromExitNodes(Region region, Template template) throws IncQueryException {
-		// A különbözõ exit node-ok megkülönböztetésére
+		// To guarantee unique names
 		int id = 0; 
-		// Lekérjük a exit node-okat
 		ExitNodesMatcher exitNodesMatcher = engine.getMatcher(ExitNodesQuerySpecification.instance());
-		// Megnézzük a state matcheket és létrehozzuk a location-öket		
 		for (ExitNodesMatch exitNodesMatch : exitNodesMatcher.getAllMatches(null, region)) {
-			// Létrehozunk egy új locationt
 			Location exitNode = builder.createLocation("ExitNode" + (id++), template);
-			stateLocationMap.put(exitNodesMatch.getExit(), exitNode); // Az exit node-location párokat betesszük a map-be	
+			stateLocationMap.put(exitNodesMatch.getExit(), exitNode); // Putting the  exit node-location pairs into the map		
 			builder.setLocationComment(exitNode, "An exit node");
 		}
 	}
 	
 	/**
-	 * Ez a metódus felelõs az exit node-okba vezetõ élek broadcast ! szinkronizációjának, és a felette lévõ régiók ? szinkornizációjának létrehozásáért.
+	 * This method creates ! synchronizations on incoming edges of exit nodes, and ? synchronization on the default transition of the composite state.
 	 * @throws IncQueryException
 	 */
 	private void createUpdatesForExitNodes() throws IncQueryException {
-		// Lekérjük az exit node-okat
 		ExitNodeSyncMatcher exitNodeSyncMatcher = engine.getMatcher(ExitNodeSyncQuerySpecification.instance());
 		for (ExitNodeSyncMatch exitNodesMatch : exitNodeSyncMatcher.getAllMatches()) {
 			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
 			Edge exitNodeEdge = transitionEdgeMap.get(exitNodesMatch.getExitNodeTransition());
 			builder.setEdgeSync(exitNodeEdge, syncChanVar + (syncChanId), true);
 			builder.setEdgeSync(transitionEdgeMap.get(exitNodesMatch.getDefaultTransition()), syncChanVar + (syncChanId), false);
-			//Nem kell letiltani az össezs alatta lévõ regiont, mert azt a kimenõ él automatikusan megcsinálja			
+			// The subregions should not be prohibitied, as the outgoing edge of the composite state location automatically does it
 		}
 	}
 	
 	/**
-	 * Ez a metódus létrehozza az UPPAAL edge-eket az azonos regionbeli Yakindu transition-ök alapján az EdgesInSameRegionMatcheket felhasználva.
-	 * @param region A Yakindu region, amelybõl a transitionök valók.
-	 * @param template Az UPPAAL template, amelybe az edgeket kell rakni.
-	 * @throws Exception 
+	 * This method creates Uppaal edges based on Yakindu transitions whose source and target are in the same region.
+	 * @param region Yakindu region whose transitions we want to process
+	 * @param template Uppaal template this method puts the edges into
+	 * @throws Exception
 	 */
 	private void createEdges(Region region, Template template) throws Exception {
-		//Lekérjük a transition match-eket	
 		EdgesInSameRegionMatcher edgesInSameRegionMatcher = engine.getMatcher(EdgesInSameRegionQuerySpecification.instance());
-		// Megnézzük a transition match-eket és létrehozzuk az edge-eket a megfelelõ guardokkal és effectekkel
 		for (EdgesInSameRegionMatch edgesInSameRegionMatch : edgesInSameRegionMatcher.getAllMatches(null, null, null, region)) {											
-			// Ha a két végpont a helyes region-ben van
+			// If both the source and target are in the given region
 			if (!(stateLocationMap.containsKey(edgesInSameRegionMatch.getSource()) && stateLocationMap.containsKey(edgesInSameRegionMatch.getTarget()))) {								
 				throw new Exception("The source or the target is null.");
 			}
-			//Létrehozunk egy edge-t
-			Edge anEdge = builder.createEdge(template); 
-			//Beállítjuk az edge forrását és célját
+			Edge anEdge = builder.createEdge(template);
 			anEdge.setSource(stateLocationMap.get(edgesInSameRegionMatch.getSource()));
 			anEdge.setTarget(stateLocationMap.get(edgesInSameRegionMatch.getTarget()));
-			transitionEdgeMap.put(edgesInSameRegionMatch.getTransition(), anEdge);
-							
+			transitionEdgeMap.put(edgesInSameRegionMatch.getTransition(), anEdge); // Putting the  transition-edge pairs into the map							
 		}
 	}
 	
 	/**
-	 * Ez a metódus hozza létre a composite state-ek entry locationjét. Ez a state-be lépéskor az alrégiókba való lépés miatt szükséges.
-	 * (Hogy az minden esetben megvalósuljon.)
+	 * This method creates the entry location of composite states, so subregion activation may take place at every ordinary enter.
 	 * @throws Exception 
 	 */
 	private void createEntryForCompositeStates() throws Exception {
-		// Lekérjük az állapotokat
 		CompositeStatesMatcher compositeStatesMatcher = engine.getMatcher(CompositeStatesQuerySpecification.instance());
 		SourceAndTargetOfTransitionsMatcher sourceAndTargetOfTransitionsMatcher = engine.getMatcher(SourceAndTargetOfTransitionsQuerySpecification.instance());
-		// Megnézzük a state matcheket és létrehozzuk az entry locationöket
 		for (CompositeStatesMatch compositeStateMatch : compositeStatesMatcher.getAllMatches()) {				
-			// Létrehozzuk a locationt, majd a megfelelõ éleket a megfelelõ location-ökbe kötjük
+			// Create entry location
 			Location stateEntryLocation = createEntryLocation(compositeStateMatch.getCompositeState(), compositeStateMatch.getParentRegion());
-			// Átállítjuk a bejövõ élek targetjét, ehhez felhasználjuk az összes élet lekérdezõ metódust
+			// Set the targets of each incoming edge to the entry location
 			for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : sourceAndTargetOfTransitionsMatcher.getAllMatches(null, null, compositeStateMatch.getCompositeState())) {
+				// Only same region edges
 				if ((transitionEdgeMap.containsKey(sourceAndTargetOfTransitionsMatch.getTransition()))) {
-					//throw new Exception("The transition is not mapped: " + sourceAndTargetOfTransitionsMatch.getTransition().getSource().getName() + " -> " + sourceAndTargetOfTransitionsMatch.getTransition().getTarget().getName());
 					transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()).setTarget(stateEntryLocation);
 				}	
 				
@@ -491,63 +473,57 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
-	 * Ez a metódus létrehoz egy (committed) entry locationt egy state-nek.
-	 * @param vertex A Yakindu vertex, amelynek entry locationt szeretnénk létrehozni.
-	 * @param region Yakindu region, a state parentRegionje.
-	 * @return Uppaal location, amely a megadott vertex entry locationeként funkcionál.
+	 * This method creates a committed entry location for a state.
+	 * @param vertex Yakindu vertex, that an entry location is needed to
+	 * @param region Yakindu region, a parent region of the vertex
+	 * @return Uppaal location, entry location of the given state
 	 */
 	private Location createEntryLocation(Vertex vertex, Region region) {
-		// Létrehozzuk a locationt, majd a megfelelõ éleket a megfelelõ location-ökbe kötjük
 		Location stateEntryLocation = builder.createLocation("EntryLocationOf" + vertex.getName() + (entryStateId++), regionTemplateMap.get(region));
 		builder.setLocationCommitted(stateEntryLocation);
 		Edge entryEdge = builder.createEdge(regionTemplateMap.get(region));
 		builder.setEdgeSource(entryEdge, stateEntryLocation);
 		builder.setEdgeTarget(entryEdge, stateLocationMap.get(vertex));
-		// Berakjuk a state-edge párt a map-be
-		hasEntryLoc.put(vertex, entryEdge);
+		hasEntryLoc.put(vertex, entryEdge); // Putting the  vertex-edge pairs into the map		
 		return stateEntryLocation;
 	}
 	
 	/**
-	 * Ez a metódus hozza létre a composite state-ekbe vezetõ élen a broadcast ! szinkornizációs csatornát, 
-	 * és az eggyel alatta lévõ régiókban a ? szinkornizációs csatornákat. Ez utóbbi végpontja attól függ, hogy értelmezett-e a régióban history.
+	 * This method creates ! sync on each entry location edge of composite states, and ? syncs in each subregion of composite states.
 	 * @throws Exception 
 	 */
 	private void createEntryEdgesForAbstractionLevels() throws Exception {
-		// Lekérjük a composite állapotokat
 		CompositeStatesMatcher compositeStatesMatcher = engine.getMatcher(CompositeStatesQuerySpecification.instance());
-		// Megnézzük a state matcheket és létrehozzuk az entry locationöket
 		for (CompositeStatesMatch compositeStateMatch : compositeStatesMatcher.getAllMatches()) {
 			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
+			// Entry location edges must already be created
 			Edge entryEdge = hasEntryLoc.get(compositeStateMatch.getCompositeState());
 			builder.setEdgeSync(entryEdge, syncChanVar + (syncChanId), true);
 			for (Region subregion : compositeStateMatch.getCompositeState().getRegions()) {
 				generateNewInitLocation(subregion);
 			}
-			// Minden eggyel alatti régióban létrehozzuk a szükséges ? sync-eket
+			// Create ? syncs in all subregions
 			setAllRegionsWithSync(true, compositeStateMatch.getCompositeState().getRegions());			
 		}
 	}
 	
 	/**
-	 * Ez a metódus hozza létre a composite state-ekbõl kivezetõ éleken a broadcast ! szinkronizációs csatornát,
-	 * és minden alatta lévõ régióban a ? szinkronizációs csatornákat. Utóbbi esetben a csatorna mindig önmagába vezet.
+	 * This method creates ! sync on each outgoing edge of composite states, and ? syncs in each region whose ancestor is the composite states.
 	 * @throws Exception 
 	 */
 	private void createExitEdgesForAbstractionLevels() throws Exception {
 		int id = 0;
-		// Lekérjük a composite állapotokat
 		CompositeStatesMatcher compositeStatesMatcher = engine.getMatcher(CompositeStatesQuerySpecification.instance());
 		SourceAndTargetOfTransitionsMatcher sourceAndTargetOfTransitionsMatcher = engine.getMatcher(SourceAndTargetOfTransitionsQuerySpecification.instance());
-		// Megnézzük az összes compositeState matchet
 		for (CompositeStatesMatch compositeStateMatch : compositeStatesMatcher.getAllMatches()) {
 			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
-			// Minden kimenõ élre ráírjuk a kilépési sync-et
+			// Each outgoing edge must be updated by the exiting sync
 			for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : sourceAndTargetOfTransitionsMatcher.getAllMatches(null, compositeStateMatch.getCompositeState(), null)) {				
 				if (transitionEdgeMap.containsKey(sourceAndTargetOfTransitionsMatch.getTransition())) { // So we investigate only same region edges
 					if (transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()).getSynchronization() == null) {
 						builder.setEdgeSync(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), syncChanVar + (syncChanId), true);
 					}
+					// If the outgoing edge already has a sync, a syncing location is created
 					else {
 						Edge syncEdge = createSyncLocation(stateLocationMap.get(sourceAndTargetOfTransitionsMatch.getTarget()), "CompositeSyncLocation" + (++id), null);
 						builder.setEdgeSync(syncEdge, syncChanVar + (syncChanId), true);
@@ -555,7 +531,7 @@ public class CommandHandler extends AbstractHandler {
 					}	
 				}
 			}
-			// Letiltjuk az összes alatta lévõ region-t
+			// Disabling all regions below it
 			List<Region> subregionList = new ArrayList<Region>();
 			Helper.addAllSubregionsToRegionList(compositeStateMatch.getCompositeState(), subregionList);
 			setAllRegionsWithSync(false, subregionList);			
@@ -563,23 +539,22 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
-	 * Minden megadott régióban létrehozza a ? szinkronizációs csatornákat, és azokon az érvényességi változók updatejeit. Illetve egy initLocation-t, ha elõször építjük fel a template-et.
-	 * Ezek a csatornák vagy önmagukba vagy az region entrybe vezetnek.
-	 * @param needInit Kell-e initLocation a template-be.
-	 * @param regionList Yakindu regionök listája, amelyeken létre szeretnénk hozni a ? csatornákat az update-ekkel.
+	 * Creates ? sync edges and isActive updates in all regions given in the list. These edges may lead to the init location or to their sources.
+	 * @param toBeTrue True if region activation is needed, false if region disabling is needed
+	 * @param regionList List of Yakindu regions that need to be synced
 	 * @throws Exception 
 	 */
 	private void setAllRegionsWithSync(boolean toBeTrue, List<Region> regionList) throws Exception {
 		VerticesOfRegionsMatcher verticesOfRegionsMatcher = engine.getMatcher(VerticesOfRegionsQuerySpecification.instance());
 		for (Region subregion : regionList) {	
 			for (VerticesOfRegionsMatch verticesOfRegionMatch : verticesOfRegionsMatcher.getAllMatches(subregion, null)) {
-				// Choice-okból nem csinálunk magukba éleket, azokban elvileg nem tartózkodhatunk
+				// No loop edge from choice or entry locations
 				if (!(Helper.isChoice(verticesOfRegionMatch.getVertex())) && !(Helper.isEntry(verticesOfRegionMatch.getVertex()))) {
 					Edge syncEdge = builder.createEdge(regionTemplateMap.get(subregion));
 					builder.setEdgeSync(syncEdge, syncChanVar + syncChanId, false);
 					builder.setEdgeUpdate(syncEdge, isActiveVar + " = " + ((toBeTrue) ? "true" : "false"));
 					builder.setEdgeSource(syncEdge, stateLocationMap.get(verticesOfRegionMatch.getVertex()));
-					// Ha belépésre engedélyezzük a régiót, akkor vizsgálni kell, hogy hova kössük a szinkornizációs él végpontját
+					// In case of entry, we investigate where the sync edge must be connected depending on history indicators
 					if (toBeTrue) {
 						if (Helper.hasHistory(subregion)) {
 							if (hasEntryLoc.containsKey(verticesOfRegionMatch.getVertex())) {
@@ -593,7 +568,7 @@ public class CommandHandler extends AbstractHandler {
 							builder.setEdgeTarget(syncEdge, stateLocationMap.get(Helper.getEntryOfRegion(subregion)));
 						}
 					}
-					// Kilépéskor nem vizsgálhatjuk, hogy van-e history pl.: entryLoc-ja van valamelyik composite state-nek és az committed
+					// In case of exit the sync edge must be a loop edge
 					else {
 						builder.setEdgeTarget(syncEdge, stateLocationMap.get(verticesOfRegionMatch.getVertex()));
 					}
@@ -603,7 +578,7 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
-	 * This method creates a init location int the mapped region (in the template equivalent) and ties it to the entry of the region.
+	 * This method creates a init location int the mapped region (in the template equivalent) and connects it to the entry of the region.
 	 * @param region The region whose template equivalent will get the generated init location
 	 * @throws IncQueryException
 	 */
@@ -619,16 +594,13 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
-	 * Létrehozza azokat az éleket, amelyeknek végpontjai nem ugyanazon regionben találhatók.
+	 * Creates edges whose source and target are not in the same region.
 	 * @throws Exception 
 	 */
 	private void createEdgesForDifferentAbstraction() throws Exception {
-		//Lekérjük a transition match-eket		
 		EdgesAcrossRegionsMatcher edgesAcrossRegionsMatcher = engine.getMatcher(EdgesAcrossRegionsQuerySpecification.instance());
-		// Megnézzük a transition match-eket és létrehozzuk az edge-eket a megfelelõ guardokkal és effectekkel
 		for (EdgesAcrossRegionsMatch acrossTransitionMatch : edgesAcrossRegionsMatcher.getAllMatches()) {											
-			// Ha a két végpont nem azonos region-ben van:
-			// Megnézzük melyik milyen szintû, és aszerint hozzuk létre a szinkronizációs csatornákat
+			// The level of both endpoints must be investigated and further action must be taken accordingly
 			if (!(stateLocationMap.containsKey(acrossTransitionMatch.getSource()) && stateLocationMap.containsKey(acrossTransitionMatch.getTarget()))) {								
 				throw new Exception("The target or the source is not mapped: " + acrossTransitionMatch.getSource() + " " + stateLocationMap.containsKey(acrossTransitionMatch.getTarget()));				
 			}
@@ -645,47 +617,49 @@ public class CommandHandler extends AbstractHandler {
 	
 	/**
 	 * Létrehozza az absztrakciós szintek közötti tranziciókhoz szükséges éleket.
-	 * Csak akkor mûködik, ha a source szintje kisebb, mint a target szintje.
-	 * @param source Yakindu vertex, a tranzició kezdõpontja.
-	 * @param target Yakindu vertex, a tranzició végpontja.
-	 * @param transition Yakindu transition, ennek fogjuk megfeleltetni a legfelsõ szinten létrehozott edget.
-	 * @param lastLevel Egész szám, amely megmondja, hogy a target hányadik szinten van.
+	 * Creates edges needed for the transitions across regions.
+	 * Works only if the level of the source is smaller than the level of the target.
+	 * @param source Yakindu vertex, source of the transition
+	 * @param target Yakindu vertex, target of the transition
+	 * @param transition Yakindu transition that crosses regions
+	 * @param lastLevel Integer, indicating the level of the target.
 	 * @throws Exception 
 	 */ 
 	private void createEdgesWhenSourceLesser(Vertex source, Vertex target, Transition transition, int lastLevel, int levelDifference, List<Region> visitedRegions) throws Exception {
-		// Rekurzió:
-		// Visszamegyünk a legfölsõ szintre, majd onnan visszalépkedve, sorban minden szinten létrehozzuk a szinkronizációkat
+		// Recursion:
+		// Going back to the top level, and from there on each level syncs are created
 		if (source.getParentRegion() != target.getParentRegion()) {
 			visitedRegions.add(target.getParentRegion());
 			createEdgesWhenSourceLesser(source, (Vertex) target.getParentRegion().getComposite(), transition, lastLevel, levelDifference, visitedRegions);
 		}
-		// Ha a legfölsõ szintet elértük:
+		// If top level is reached:
 		// Létrehozunk új sync változót, és a source-ból a composite statebe vezetünk egy élet a sync változóval
 		if (source.getParentRegion() == target.getParentRegion()) {
-			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
+			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";"); // New sync variable is created
+			// Edge is created with the new sync on it
 			Edge abstractionEdge = builder.createEdge(regionTemplateMap.get(source.getParentRegion()));
 			builder.setEdgeSource(abstractionEdge, stateLocationMap.get(source));
 			builder.setEdgeTarget(abstractionEdge, stateLocationMap.get(target));
 			builder.setEdgeSync(abstractionEdge, syncChanVar + (syncChanId), true);
 			builder.setEdgeComment(abstractionEdge, "A Yakinduban alacsonyabb absztrakcios szinten levo vertexbe vezeto el.");
-			// Ha a targetnek van entryEventje, akkor azt rá kell írni az élre
-			setHelperEdgeEntryEvent(abstractionEdge, target, lastLevel);
-			// Ez az él felel majd meg a regionökön átívelõ transitionnek
+			// If the target has entry event, it must be written onto the edge
+			setHelperEdgeEntryEvent(abstractionEdge, target, lastLevel); 
+			// This edge is the mapped edge of the across region transition	
 			transitionEdgeMap.put(transition, abstractionEdge);
-			// A target composite state, belépésre minden alrégiójába is belépünk
+			// If the target is a composite state, we enter all its subregions except the visited ones
 			setEdgeEntryAllSubregions(target, visitedRegions);
 		}	
-		// Ha nem a legfölsõ szinten vagyunk, akkor létrehozzuk a ? szinkronizációs éleket minden állapotból a megfelelõ állapotba
+		// If we are not in top region, ? synced edges are created from EVERY location and connected to the target (so enter is possible no matter the history)
 		else {
 			VerticesOfRegionsMatcher verticesOfRegionsMatcher = engine.getMatcher(VerticesOfRegionsQuerySpecification.instance());
 			for (VerticesOfRegionsMatch verticesOfRegionsMatch : verticesOfRegionsMatcher.getAllMatches(target.getParentRegion(), null)) {				
 				setHelperEdges(stateLocationMap.get(verticesOfRegionsMatch.getVertex()), target, lastLevel);
 			}
-			// Altemplate "initial location"-jét is bekötjük a megfelelõ locationbe
+			// Subtemplate's "initial location" is connected to the right location
 			if (hasInitLoc.containsKey(regionTemplateMap.get(target.getParentRegion()))) {
 				setHelperEdges(hasInitLoc.get(regionTemplateMap.get(target.getParentRegion())), target, lastLevel);				
 			}
-			// Ha a target composite state, akkor ezt minden region-jére megismételjük, kivéve ezt a regiont
+			// If the target is a composite state, we enter all its regions apart from this one
 			// Except if it is the last level: then we enter the state ordinarily
 			if (lastLevel != Helper.getLevelOfVertex(target) && Helper.isCompositeState(target)) {
 				setEdgeEntryAllSubregions(target, visitedRegions);
@@ -742,7 +716,7 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	private void setEdgeEntryAllSubregions(Vertex target, List<Region> visitedRegions) throws Exception {		
-		List<Region> pickedSubregions = new ArrayList<Region>(((State) target).getRegions()); // Talán addAll kéne?
+		List<Region> pickedSubregions = new ArrayList<Region>(((State) target).getRegions());
 		pickedSubregions.removeAll(visitedRegions);
 		setAllRegionsWithSync(true, pickedSubregions);		
 		setSyncFromGeneratedInit(pickedSubregions);
