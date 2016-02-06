@@ -633,7 +633,6 @@ public class CommandHandler extends AbstractHandler {
 			createEdgesWhenSourceLesser(source, (Vertex) target.getParentRegion().getComposite(), transition, lastLevel, levelDifference, visitedRegions);
 		}
 		// If top level is reached:
-		// Létrehozunk új sync változót, és a source-ból a composite statebe vezetünk egy élet a sync változóval
 		if (source.getParentRegion() == target.getParentRegion()) {
 			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";"); // New sync variable is created
 			// Edge is created with the new sync on it
@@ -648,6 +647,10 @@ public class CommandHandler extends AbstractHandler {
 			transitionEdgeMap.put(transition, abstractionEdge);
 			// If the target is a composite state, we enter all its subregions except the visited ones
 			setEdgeEntryAllSubregions(target, visitedRegions);
+			// If the source is a composite state, all subregions must be disabled
+			if (Helper.isCompositeState(source)) {
+				setEdgeExitAllSubregions(source, new ArrayList<Region>());
+			}
 		}	
 		// If we are not in top region, ? synced edges are created from EVERY location and connected to the target (so enter is possible no matter the history)
 		else {
@@ -754,7 +757,15 @@ public class CommandHandler extends AbstractHandler {
 			// A felsõ szinten létrehozzuk az élet, amely fogadja a szinkronizációt
 			Edge ownSyncEdge = builder.createEdge(regionTemplateMap.get(source.getParentRegion()));
 			builder.setEdgeSource(ownSyncEdge, stateLocationMap.get(source));
-			builder.setEdgeTarget(ownSyncEdge, stateLocationMap.get(target));
+			// If the target has entry loc, that must be the edge targer
+			if (hasEntryLoc.containsKey(target)) {
+				System.out.println("Itt");
+				builder.setEdgeTarget(ownSyncEdge, builder.getEdgeSource(hasEntryLoc.get(target)));
+			}
+			else {
+				System.out.println("Nem itt");
+				builder.setEdgeTarget(ownSyncEdge, stateLocationMap.get(target));
+			}
 			builder.setEdgeSync(ownSyncEdge, syncChanVar + (syncChanId), false);
 			// Exit eventet rárakjuk, ha van
 			setHelperEdgeExitEvent(ownSyncEdge, source, lastLevel);
