@@ -290,12 +290,7 @@ public class CommandHandler extends AbstractHandler {
 			
 			// Creating edges from same region transitions																		
 			createEdges(regionMatch.getRegion(), template);			
-		}	
-		
-		// Setting the updates of incoming edges of final states
-		createFinalStateEdgeUpdates();
-		
-		
+		}			
 		
 		// Creating entry location for each composite state
 		createEntryForCompositeStates();
@@ -311,6 +306,9 @@ public class CommandHandler extends AbstractHandler {
 		
 		// Creating the synchronizations of exit nodes
 		createUpdatesForExitNodes();
+		
+		// Setting the updates of incoming edges of final states
+		createFinalStateEdgeUpdates();				
 
 		// Creating edge effects
 		setEdgeUpdates();
@@ -581,6 +579,7 @@ public class CommandHandler extends AbstractHandler {
 					// In case of exit the sync edge must be a loop edge
 					else {
 						builder.setEdgeTarget(syncEdge, stateLocationMap.get(verticesOfRegionMatch.getVertex()));
+						setHelperEdgeExitEvent(syncEdge, verticesOfRegionMatch.getVertex(), entryStateId);
 					}
 				}
 			}			
@@ -626,7 +625,6 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
-	 * Létrehozza az absztrakciós szintek közötti tranziciókhoz szükséges éleket.
 	 * Creates edges needed for the transitions across regions.
 	 * Works only if the level of the source is smaller than the level of the target.
 	 * @param source Yakindu vertex, source of the transition
@@ -650,7 +648,7 @@ public class CommandHandler extends AbstractHandler {
 			builder.setEdgeSource(abstractionEdge, stateLocationMap.get(source));
 			builder.setEdgeTarget(abstractionEdge, stateLocationMap.get(target));
 			builder.setEdgeSync(abstractionEdge, syncChanVar + (syncChanId), true);
-			builder.setEdgeComment(abstractionEdge, "A Yakinduban alacsonyabb absztrakcios szinten levo vertexbe vezeto el.");
+			builder.setEdgeComment(abstractionEdge, "In Yakindu this edge leads to a vertex in another region. (Lower abstraction)");
 			// If the target has entry event, it must be written onto the edge
 			setHelperEdgeEntryEvent(abstractionEdge, target, lastLevel); 
 			// This edge is the mapped edge of the across region transition	
@@ -700,23 +698,37 @@ public class CommandHandler extends AbstractHandler {
 		}
 	}
 	
+	/**
+	 * This method builds ? synchronization edges from the given source to the given target.
+	 * @param source Uppaal location 
+	 * @param target Yakindu target whose Uppaal equivalent the edge will be connected to
+	 * @param lastLevel Integer indicating the lowest abstraction level in the given mapping
+	 * @throws IncQueryException
+	 */
 	private void setHelperEdges(Location source, Vertex target, int lastLevel) throws IncQueryException {
 		Edge syncEdge = builder.createEdge(source.getParentTemplate());					
 		builder.setEdgeSource(syncEdge, source);		
-		// Ha utolsó szinten vagyunk, és egy composite state-be megyünk, akkor az entryLocjába kell kötni
+		// On the last level if the target has an entry location, the edge must be connected to it
 		if (lastLevel == Helper.getLevelOfVertex(target) && hasEntryLoc.containsKey(target)) {
 			builder.setEdgeTarget(syncEdge, builder.getEdgeSource(hasEntryLoc.get(target)));
 		}							
-		// Itt már nem kell entryLocba kötni, mert az lehet, hogy elrontaná az alsóbb régiók helyes állapotatit (tehát csak legalsó szinten kell entryLocba kötni)
+		// On other levels it MUST NOT be connected to the entry location for it might spoil the whole mappping
 		else {					
 			builder.setEdgeTarget(syncEdge, stateLocationMap.get(target));
-		}					
-		// Ha a targetnek van entryEventje, akkor azt rá kell írni az élre
+		}
+		// If the target has an entry event, it must be written onto the edge
 		setHelperEdgeEntryEvent(syncEdge, target, lastLevel);
 		builder.setEdgeSync(syncEdge, syncChanVar + (syncChanId), false);
 		builder.setEdgeUpdate(syncEdge, isActiveVar + " = true");
 	}
 	
+	/**
+	 * This method writes the entry event of the given target onto the given edge
+	 * @param edge Uppaal edge
+	 * @param target Yakindu target whose Uppaal equivalent the edge will be connected to
+	 * @param lastLevel Integer indicating the lowest abstraction level in the given mapping
+	 * @throws IncQueryException
+	 */	
 	private void setHelperEdgeEntryEvent(Edge edge, Vertex target, int lastLevel) throws IncQueryException {
 		if (Helper.hasEntryEvent(target) && lastLevel != Helper.getLevelOfVertex(target)) {
 			for (StatesWithEntryEventMatch statesWithEntryEventMatch : runOnceEngine.getAllMatches(StatesWithEntryEventMatcher.querySpecification())) {
@@ -728,6 +740,12 @@ public class CommandHandler extends AbstractHandler {
 		}
 	}
 	
+	/**
+	 * This method creates all the entry helper edges for the given target.
+	 * @param target Yakindu target whose subregions will get the helper edges
+	 * @param visitedRegions List of Yakindu regions that will NOT get edges
+	 * @throws Exception
+	 */
 	private void setEdgeEntryAllSubregions(Vertex target, List<Region> visitedRegions) throws Exception {		
 		List<Region> pickedSubregions = new ArrayList<Region>(((State) target).getRegions());
 		pickedSubregions.removeAll(visitedRegions);
@@ -736,35 +754,34 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
-	 * Létrehozza az absztrakciós szintek közötti tranziciókhoz szükséges éleket.
-	 * Csak akkor mûködik, ha a source szintje nagyobb, mint a target szintje.
-	 * @param source Yakindu vertex, a tranzició kezdõpontja.
-	 * @param target Yakindu vertex, a tranzició végpontja.
-	 * @param transition Yakindu transition, ennek fogjuk megfeleltetni a legfelsõ szinten létrehozott edget.
-	 * @param lastLevel Egész szám, amely megmondja, hogy a source hányadik szinten van.
+	 * Creates edges needed for the transitions across regions.
+	 * Works only if the level of the source is greater than the level of the target.
+	 * @param source Yakindu vertex, source of the transition
+	 * @param target Yakindu vertex, target of the transition
+	 * @param transition Yakindu transition that crosses regions
+	 * @param lastLevel Integer, indicating the level of the source
 	 * @throws Exception 
-	 */
+	 */ 
 	private void createEdgesWhenSourceGreater(Vertex source, Vertex target, Transition transition, int lastLevel, List<Region> visitedRegions) throws Exception {
-		// A legalsó szinten létrehozunk egy magába vezetõ élet:  
-		// Ez felel meg az alacsonyabb szintrõl magasabb szinten lévõ vertexbe vezetõ átmenetnek
+		// On the lowest level a loop edge is created
 		if (Helper.getLevelOfVertex(source) == lastLevel) {
 			visitedRegions.add(source.getParentRegion());
-			// Létrehozunk egy szinkronizációs csatornát rá
+			// Creating a sync channel
 			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
 			Edge ownSyncEdge = builder.createEdge(regionTemplateMap.get(source.getParentRegion()));
 			builder.setEdgeSource(ownSyncEdge, stateLocationMap.get(source));
 			builder.setEdgeTarget(ownSyncEdge, stateLocationMap.get(source));
 			builder.setEdgeSync(ownSyncEdge, syncChanVar + (syncChanId), true);
-			// Letiltjuk ezt a régiót, mert önmagára nem tud szinkronizálni
+			// Diasabling this region beacause it cannot synchronize to itself
 			builder.setEdgeUpdate(ownSyncEdge, isActiveVar + " = false");
-			builder.setEdgeComment(ownSyncEdge, "A Yakinduban magasabb absztrakcios szinten levo vertexbe vezeto el.");
-			// Ez az él felel majd meg a regionökön átívelõ transitionnek
+			builder.setEdgeComment(ownSyncEdge, "In Yakindu this edge leads to a vertex in another region. (Higher abstraction)");			 
+			// This edge is the mapped edge of the across region transition	
 			transitionEdgeMap.put(transition, ownSyncEdge);
 			createEdgesWhenSourceGreater((Vertex) source.getParentRegion().getComposite(), target, transition, lastLevel, visitedRegions);
 		}
-		// A felsõ szint
+		// The top level
 		else if (Helper.getLevelOfVertex(source) == Helper.getLevelOfVertex(target)) {
-			// A felsõ szinten létrehozzuk az élet, amely fogadja a szinkronizációt
+			// On the top level an edge is created to receive synchronization
 			Edge ownSyncEdge = builder.createEdge(regionTemplateMap.get(source.getParentRegion()));
 			builder.setEdgeSource(ownSyncEdge, stateLocationMap.get(source));
 			// If the target has entry loc, that must be the edge targer
@@ -775,14 +792,14 @@ public class CommandHandler extends AbstractHandler {
 				builder.setEdgeTarget(ownSyncEdge, stateLocationMap.get(target));
 			}
 			builder.setEdgeSync(ownSyncEdge, syncChanVar + (syncChanId), false);
-			// Exit eventet rárakjuk, ha van
-			setHelperEdgeExitEvent(ownSyncEdge, source, lastLevel);
-			// Itt letiltjuk az összes source alatt lévõ régiót, jelezve, hogy azok már nem érvényesek
-			// Kivéve a meglátogatottakat
+			// The edge gets an update if the state has exit event
+			setHelperEdgeExitEvent(ownSyncEdge, source);
+			// All descendant regions are disabled except for the visited ones
 			setEdgeExitAllSubregions(source, visitedRegions);
 			return;
 		}
 		// Közbülsõ szinteken csak kézzel létrehozzuk a sync éleket, letiltjuk a régiót, és rájuk írjuk az exit expressiont, ha van
+		// On other levels we create sync edges, disable the region and write exit event on them
 		else {
 			visitedRegions.add(source.getParentRegion());
 			Edge ownSyncEdge = builder.createEdge(regionTemplateMap.get(source.getParentRegion()));
@@ -790,12 +807,12 @@ public class CommandHandler extends AbstractHandler {
 			builder.setEdgeTarget(ownSyncEdge, stateLocationMap.get(source));
 			builder.setEdgeSync(ownSyncEdge, syncChanVar + (syncChanId), false);
 			builder.setEdgeUpdate(ownSyncEdge, isActiveVar + " = false");
-			setHelperEdgeExitEvent(ownSyncEdge, source, lastLevel);
+			setHelperEdgeExitEvent(ownSyncEdge, source);
 			createEdgesWhenSourceGreater((Vertex) source.getParentRegion().getComposite(), target, transition, lastLevel, visitedRegions);
 		}
 	}
 	
-	private void setHelperEdgeExitEvent(Edge edge, Vertex source, int lastLevel) throws IncQueryException {
+	private void setHelperEdgeExitEvent(Edge edge, Vertex source) throws IncQueryException {
 		if (Helper.hasExitEvent(source)) {
 			for (StatesWithExitEventWithoutOutgoingTransitionMatch statesWithExitEventMatch : runOnceEngine.getAllMatches(StatesWithExitEventWithoutOutgoingTransitionMatcher.querySpecification())) {
 				if (statesWithExitEventMatch.getState() == source) {
