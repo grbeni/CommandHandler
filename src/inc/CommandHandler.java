@@ -295,8 +295,7 @@ public class CommandHandler extends AbstractHandler {
 		// Setting the updates of incoming edges of final states
 		createFinalStateEdgeUpdates();
 		
-		// Creating the synchronizations of exit nodes
-		createUpdatesForExitNodes();
+		
 		
 		// Creating entry location for each composite state
 		createEntryForCompositeStates();
@@ -309,6 +308,9 @@ public class CommandHandler extends AbstractHandler {
 		
 		// Setting the not ordinary (across templates) synchronizations.
 		createEdgesForDifferentAbstraction();
+		
+		// Creating the synchronizations of exit nodes
+		createUpdatesForExitNodes();
 
 		// Creating edge effects
 		setEdgeUpdates();
@@ -418,14 +420,22 @@ public class CommandHandler extends AbstractHandler {
 	
 	/**
 	 * This method creates ! synchronizations on incoming edges of exit nodes, and ? synchronization on the default transition of the composite state.
-	 * @throws IncQueryException
+	 * @throws Exception 
 	 */
-	private void createUpdatesForExitNodes() throws IncQueryException {
+	private void createUpdatesForExitNodes() throws Exception {
+		int id = 0;
 		ExitNodeSyncMatcher exitNodeSyncMatcher = engine.getMatcher(ExitNodeSyncQuerySpecification.instance());
 		for (ExitNodeSyncMatch exitNodesMatch : exitNodeSyncMatcher.getAllMatches()) {
 			builder.addGlobalDeclaration("broadcast chan " + syncChanVar + (++syncChanId) + ";");
 			Edge exitNodeEdge = transitionEdgeMap.get(exitNodesMatch.getExitNodeTransition());
 			builder.setEdgeSync(exitNodeEdge, syncChanVar + (syncChanId), true);
+			if (transitionEdgeMap.get(exitNodesMatch.getDefaultTransition()).getSynchronization() != null ) {
+				if (transitionEdgeMap.get(exitNodesMatch.getDefaultTransition()).getSynchronization().getKind().getValue() == 0) {
+					throw new Exception("? sync on default edge of exit node");
+				}				
+				Edge syncEdge = createSyncLocation(builder.getEdgeTarget(transitionEdgeMap.get(exitNodesMatch.getDefaultTransition())), "exitNodeSyncLoc" + (id++), transitionEdgeMap.get(exitNodesMatch.getDefaultTransition()).getSynchronization());
+				builder.setEdgeTarget(transitionEdgeMap.get(exitNodesMatch.getDefaultTransition()), builder.getEdgeSource(syncEdge));				
+			}
 			builder.setEdgeSync(transitionEdgeMap.get(exitNodesMatch.getDefaultTransition()), syncChanVar + (syncChanId), false);
 			// The subregions should not be prohibitied, as the outgoing edge of the composite state location automatically does it
 		}
@@ -759,11 +769,9 @@ public class CommandHandler extends AbstractHandler {
 			builder.setEdgeSource(ownSyncEdge, stateLocationMap.get(source));
 			// If the target has entry loc, that must be the edge targer
 			if (hasEntryLoc.containsKey(target)) {
-				System.out.println("Itt");
 				builder.setEdgeTarget(ownSyncEdge, builder.getEdgeSource(hasEntryLoc.get(target)));
 			}
 			else {
-				System.out.println("Nem itt");
 				builder.setEdgeTarget(ownSyncEdge, stateLocationMap.get(target));
 			}
 			builder.setEdgeSync(ownSyncEdge, syncChanVar + (syncChanId), false);
