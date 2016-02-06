@@ -295,6 +295,9 @@ public class CommandHandler extends AbstractHandler {
 		// Creating entry location for each composite state
 		createEntryForCompositeStates();
 		
+		// Creating entry location for each state with entry event
+		setEntryEdgeUpdatesFromStates();
+		
 		// Setting the entry edges of composite states, so every time we enter the state ordinarily (from the same template), all the subtemplates are set properly (isActive = true)
 		createEntryEdgesForAbstractionLevels();
 		
@@ -579,7 +582,7 @@ public class CommandHandler extends AbstractHandler {
 					// In case of exit the sync edge must be a loop edge
 					else {
 						builder.setEdgeTarget(syncEdge, stateLocationMap.get(verticesOfRegionMatch.getVertex()));
-						setHelperEdgeExitEvent(syncEdge, verticesOfRegionMatch.getVertex(), entryStateId);
+						setHelperEdgeExitEvent(syncEdge, verticesOfRegionMatch.getVertex());
 					}
 				}
 			}			
@@ -798,7 +801,6 @@ public class CommandHandler extends AbstractHandler {
 			setEdgeExitAllSubregions(source, visitedRegions);
 			return;
 		}
-		// Közbülsõ szinteken csak kézzel létrehozzuk a sync éleket, letiltjuk a régiót, és rájuk írjuk az exit expressiont, ha van
 		// On other levels we create sync edges, disable the region and write exit event on them
 		else {
 			visitedRegions.add(source.getParentRegion());
@@ -812,6 +814,12 @@ public class CommandHandler extends AbstractHandler {
 		}
 	}
 	
+	/**
+	 * This method writes the exit event of the given vertex on the given edge 
+	 * @param edge Uppaal edge
+	 * @param source Yakindu vertex
+	 * @throws IncQueryException
+	 */
 	private void setHelperEdgeExitEvent(Edge edge, Vertex source) throws IncQueryException {
 		if (Helper.hasExitEvent(source)) {
 			for (StatesWithExitEventWithoutOutgoingTransitionMatch statesWithExitEventMatch : runOnceEngine.getAllMatches(StatesWithExitEventWithoutOutgoingTransitionMatcher.querySpecification())) {
@@ -823,6 +831,12 @@ public class CommandHandler extends AbstractHandler {
 		}
 	}
 	
+	/**
+	 * This method disables all the descendant regions of the given vertex.
+	 * @param source Yakindu vertex
+	 * @param regionsToRemove List of Regions that we do not want to disable
+	 * @throws Exception
+	 */
 	private void setEdgeExitAllSubregions(Vertex source, List<Region> regionsToRemove) throws Exception {
 		List<Region> subregionList = new ArrayList<Region>();
 		State sourceState = (State) source ;
@@ -832,57 +846,60 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
-	 * Ez a metódus létrehozza az UPPAAL edge-eken az update-eket a Yakindu effectek alapján.
+	 * This method creates updates on Uppaal edges based on the Yakindu model.
 	 * @throws Exception 
 	 */
 	private void setEdgeUpdates() throws Exception {
-		// Végigmegyünk minden transition-ön, amelynek van effectje
+		// Transitions with effects
 		EdgesWithEffectMatcher edgesWithEffectMatcher = engine.getMatcher(EdgesWithEffectQuerySpecification.instance());
 		for (EdgesWithEffectMatch edgesWithEffectMatch : edgesWithEffectMatcher.getAllMatches()) {
 			String effect = UppaalCodeGenerator.transformExpression(edgesWithEffectMatch.getExpression());
 			builder.setEdgeUpdate(transitionEdgeMap.get(edgesWithEffectMatch.getTransition()), effect);
 		}
-		// Megcsiáljuk a state update-eket is
-		setEdgeUpdatesFromStates();
-		// Itt csináljuk meg a raise eventeket
+		// Creating entry and exit event updates
+		setExitEdgeUpdatesFromStates();
+		// Creating raising events
 		createRaisingEventSyncs();
 	}
 	
 	/**
-	 * Ez a metódus felel az egyes state-ek entry/exit triggerjeinek hatásaiért.
-	 * Minden Entry triggerrel rendelkezõ state esetén létrehoz egy committed location-t,
-	 * amelybõl a kivezetõ él a megfelelõ locationba vezet, és tartalmazza a szükséges update-eket.
-	 * Minden Exit triggerrel rendelkezõ state esetén a kimenõ élekre rakja rá a szükséges update-eket.
-	 * Könnyen belátható, hogy Exit esetén nem mûködne az Entry-s megoldás.
+	 * This method sets updates on outgoing edges of states with exit event.
 	 * @throws IncQueryException 
 	 */
-	private void setEdgeUpdatesFromStates() throws IncQueryException {
-		EdgesInSameRegionMatcher edgesInSameRegionMatcher = engine.getMatcher(EdgesInSameRegionQuerySpecification.instance());
-		for (StatesWithEntryEventMatch statesWithEntryEventMatch : runOnceEngine.getAllMatches(StatesWithEntryEventMatcher.querySpecification())) {
-			// Transzformáljuk a kifejezést
-			String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
-			// Ha nincs még entry state-je
-			if (!hasEntryLoc.containsKey(statesWithEntryEventMatch.getState())) {
-				// Létrehozzuk a locationt, majd a megfelelõ éleket a megfelelõ location-ökbe kötjük
-				Location stateEntryLocation = createEntryLocation(statesWithEntryEventMatch.getState(), statesWithEntryEventMatch.getParentRegion());
-				builder.setEdgeUpdate(hasEntryLoc.get(statesWithEntryEventMatch.getState()), effect);
-				// Átállítjuk a bejövõ élek targetjét
-				for (EdgesInSameRegionMatch edgesInSameRegionMatch : edgesInSameRegionMatcher.getAllMatches(null, null, statesWithEntryEventMatch.getState(), null)) {				
-					builder.setEdgeTarget(transitionEdgeMap.get(edgesInSameRegionMatch.getTransition()), stateEntryLocation);				
-				}
-			}
-			// Ha már van entry state-je
-			else {
-				builder.setEdgeUpdate(hasEntryLoc.get(statesWithEntryEventMatch.getState()), effect);
-			}
-		}
-		// Ha Exit, akkor ráírjuk az update-et minden kimenõ élre
-		// Nem használhatunk committed locationt
+	private void setExitEdgeUpdatesFromStates() throws IncQueryException {
 		for (StatesWithExitEventMatch statesWithExitEventMatch : runOnceEngine.getAllMatches(StatesWithExitEventMatcher.querySpecification())) {
 			String effect = UppaalCodeGenerator.transformExpression(statesWithExitEventMatch.getExpression());			
 			builder.setEdgeUpdate(transitionEdgeMap.get(statesWithExitEventMatch.getTransition()), effect);			
 		}
 	}
+	
+	/**
+	 * This method creates entry locations for all states with entry event and writes the update onto the entry edge.
+	 * The target of the right same region edges are set to the entry location.
+	 * @throws IncQueryException
+	 */
+	private void setEntryEdgeUpdatesFromStates() throws IncQueryException {
+		EdgesInSameRegionMatcher edgesInSameRegionMatcher = engine.getMatcher(EdgesInSameRegionQuerySpecification.instance());		
+		for (StatesWithEntryEventMatch statesWithEntryEventMatch : runOnceEngine.getAllMatches(StatesWithEntryEventMatcher.querySpecification())) {
+			// Transforming the expression
+			String effect = UppaalCodeGenerator.transformExpression(statesWithEntryEventMatch.getExpression());
+			// If it has no entry location yet
+			if (!hasEntryLoc.containsKey(statesWithEntryEventMatch.getState())) {
+				// Creating the entry location
+				Location stateEntryLocation = createEntryLocation(statesWithEntryEventMatch.getState(), statesWithEntryEventMatch.getParentRegion());
+				builder.setEdgeUpdate(hasEntryLoc.get(statesWithEntryEventMatch.getState()), effect);
+				// Set the target of the incoming edges
+				for (EdgesInSameRegionMatch edgesInSameRegionMatch : edgesInSameRegionMatcher.getAllMatches(null, null, statesWithEntryEventMatch.getState(), null)) {				
+					builder.setEdgeTarget(transitionEdgeMap.get(edgesInSameRegionMatch.getTransition()), stateEntryLocation);				
+				}
+			}
+			// If it already has an entry location
+			else {
+				builder.setEdgeUpdate(hasEntryLoc.get(statesWithEntryEventMatch.getState()), effect);
+			}
+		}
+	}
+	
 	
 	/**
 	 * Creates local reactions as a loop edge or two edges with a sync location.
