@@ -902,16 +902,19 @@ public class CommandHandler extends AbstractHandler {
 	
 	
 	/**
-	 * Creates local reactions as a loop edge or two edges with a sync location.
+	 * This method transforms each local reaction to a loop edge or a circle of two edges with a sync location if a raising expression is present (createRaisingLocationForLocalReaction method).
+	 * The source and the target of the loop is the location equivalent of the parent state of the local reaction.
 	 * @throws Exception
 	 */
 	private void createLocalReactions() throws Exception {
 		String guard = null;
+		// Local reactions with guards only
 		for (LocalReactionOnlyGuardMatch localReactionValueOfGuardMatch : runOnceEngine.getAllMatches(LocalReactionOnlyGuardMatcher.querySpecification())) {
 			Location stateLocation = stateLocationMap.get(localReactionValueOfGuardMatch.getState());
 			Edge localReactionEdge = builder.createEdge(stateLocation.getParentTemplate());
 			builder.setEdgeSource(localReactionEdge, stateLocation);
-			builder.setEdgeTarget(localReactionEdge, stateLocation);			
+			builder.setEdgeTarget(localReactionEdge, stateLocation);	
+			// In case valueof is used in Yakindu local reaction
 			if (Helper.isEventName(localReactionValueOfGuardMatch.getName())) {
 				guard = Helper.getInEventValueName(localReactionValueOfGuardMatch.getName()) + " " + localReactionValueOfGuardMatch.getOperator().getLiteral() + " " + UppaalCodeGenerator.transformExpression(localReactionValueOfGuardMatch.getGuardRightOperand());
 				builder.setEdgeSync(localReactionEdge, localReactionValueOfGuardMatch.getName(), false);
@@ -920,18 +923,22 @@ public class CommandHandler extends AbstractHandler {
 				guard = localReactionValueOfGuardMatch.getName() + " " + localReactionValueOfGuardMatch.getOperator().getLiteral() + " " + UppaalCodeGenerator.transformExpression(localReactionValueOfGuardMatch.getGuardRightOperand());				
 			}
 			builder.setEdgeGuard(localReactionEdge, guard);
+			// Raising events
 			createRaisingLocationForLocalReaction(localReactionValueOfGuardMatch.getLocalReaction(), localReactionEdge);
 		}
+		// Local reactions that are not guard only (Trigger / Trigger + Guard
 		for (LocalReactionPlainMatch localReactionPlainMatch : runOnceEngine.getAllMatches(LocalReactionPlainMatcher.querySpecification())) {
 			Location stateLocation = stateLocationMap.get(localReactionPlainMatch.getState());
 			Edge localReactionEdge = builder.createEdge(stateLocation.getParentTemplate());
 			builder.setEdgeSource(localReactionEdge, stateLocation);
 			builder.setEdgeTarget(localReactionEdge, stateLocation);
 			builder.setEdgeSync(localReactionEdge, UppaalCodeGenerator.transformExpression(localReactionPlainMatch.getExpression()), false);
+			// Handling the guards
 			if (localReactionPlainMatch.getReactionTrigger().getGuard() != null) {
 				guard = UppaalCodeGenerator.transformExpression(localReactionPlainMatch.getReactionTrigger().getGuard().getExpression());
 				builder.setEdgeGuard(localReactionEdge, guard);
 			}
+			// Raising events
 			createRaisingLocationForLocalReaction(localReactionPlainMatch.getLocalReaction(), localReactionEdge);
 		}
 		
@@ -959,15 +966,14 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
-	 * Ez a metódus létrehozza az UPPAAL edge-eken az guardokat a Yakindu guardok alapján.
+	 * This method transforms guards of Yakindu transitions and places them on their Uppaal edge equivalents.
 	 * @throws IncQueryException 
 	 */
 	private void setEdgeGuards() throws IncQueryException {
-		// Végigmegyünk minden transition-ön
 		EdgesWithGuardMatcher edgesWithGuardMatcher = engine.getMatcher(EdgesWithGuardQuerySpecification.instance());
 		EventsWithTypeMatcher eventsWithTypeMatcher = engine.getMatcher(EventsWithTypeQuerySpecification.instance());
 		for (EdgesWithGuardMatch edgesWithGuardMatch : edgesWithGuardMatcher.getAllMatches()) {
-			// Ha van guard-ja, akkor azt transzformáljuk, és ráírjuk az edge-re
+			// Transforming the guard and placing it onto the edge equivalent
 			String guard = " " + UppaalCodeGenerator.transformExpression(edgesWithGuardMatch.getExpression());
 			for (EventsWithTypeMatch eventsWithTypeMatch : eventsWithTypeMatcher.getAllMatches()) {
 				// If the guard expression cointains an in event variable, then it has to be replaced by the in event variable.
@@ -976,6 +982,7 @@ public class CommandHandler extends AbstractHandler {
 					builder.setEdgeSync(transitionEdgeMap.get(edgesWithGuardMatch.getTransition()), eventsWithTypeMatch.getName(), false);
 				}
 			}
+			// So we can concatenate guards
 			if (builder.getEdgeGuard(transitionEdgeMap.get(edgesWithGuardMatch.getTransition())) != null && builder.getEdgeGuard(transitionEdgeMap.get(edgesWithGuardMatch.getTransition())) != "") {
 				builder.setEdgeGuard(transitionEdgeMap.get(edgesWithGuardMatch.getTransition()), builder.getEdgeGuard(transitionEdgeMap.get(edgesWithGuardMatch.getTransition())) + " && " + guard);
 			}
@@ -986,14 +993,13 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
-	 * Létrehozza a template-ek érvényes mûködéséhez szükséges guardokat. (isActive)
-	 * @param transition A Yakindu transition, amelynek a megfeleltetett UPPAAL élére rakjuk rá az érvényességi guardot.
+	 * This method creates an "isActive" guard on each edge in the Uppaal model, so a transition of a template can only fire if the template is active.
 	 * @throws IncQueryException 
 	 */
 	private void createTemplateValidityGuards() throws IncQueryException {
 		SourceAndTargetOfTransitionsMatcher sourceAndTargetOfTransitionsMatcher = engine.getMatcher(SourceAndTargetOfTransitionsQuerySpecification.instance());
 		for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : sourceAndTargetOfTransitionsMatcher.getAllMatches()) {
-			// Rátesszük a guardokra a template érvényességi vátozót is
+			// So regularly transformed guards are not deleted
 			if (builder.getEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())) != null && builder.getEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())) != "") {
 				builder.setEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), ((Helper.hasFinalState()) ? ("!" + endVar + " && ") : "") + isActiveVar + " && " + "(" + builder.getEdgeGuard(transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())) + ")");
 			} 
@@ -1017,7 +1023,7 @@ public class CommandHandler extends AbstractHandler {
 	/**
 	 * This method creates raise events as another edge synchronizations where it is needed.
 	 * (If more than one raising event on an edge, the result will be linked committed locations with synched edges.)
-	 * @throws Exception jelzi, ha nem mûködik a szinkronizáció. 
+	 * @throws Exception. 
 	 */
 	private void createRaisingEventSyncs() throws Exception {
 		EdgesWithRaisingEventMatcher edgesWithRaisingEventMatcher = engine.getMatcher(EdgesWithRaisingEventQuerySpecification.instance());
@@ -1055,7 +1061,7 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
-	 * Ez a metódus hozza létre az egyes Yakundu kimeneti éleken szereplõ idõfüggõ viselkedésnek megfelelõ (after 1 s) Uppaal clock változók manipulálását.
+	 * This method creates time-related expressions (after 1 s) on the corresponding edges. Can only transform after .. expressions, and only one unit of measurement (s, ms, stb.) can be used in the entire Yakindu model for proper behaviour.
 	 * @throws IncQueryException 
 	 */
 	private void createTimingEvents() throws IncQueryException {
@@ -1068,7 +1074,8 @@ public class CommandHandler extends AbstractHandler {
 	}
 	
 	/**
-	 * This method is responsible for creating the control template, the synchronization values and gather all the integer values that can be added as an in value. 
+	 * This method is responsible for creating the control template:
+	 * gather all the integer values that can be added as an in value. 
 	 * @throws Exception 
 	 */
 	private void createControlTemplate() throws Exception {
