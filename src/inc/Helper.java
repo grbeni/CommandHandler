@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.incquery.runtime.api.IncQueryEngine;
 import org.eclipse.incquery.runtime.api.impl.RunOnceQueryEngine;
 import org.eclipse.incquery.runtime.exception.IncQueryException;
@@ -40,10 +41,11 @@ public class Helper {
 	 * Initialization.
 	 * @param engine
 	 * @param runOnceQueryEngine
+	 * @throws IncQueryException 
 	 */
-	public static void setEngine(IncQueryEngine engine, RunOnceQueryEngine runOnceQueryEngine) {
-		Helper.engine = engine;
-		Helper.runOnceEngine = runOnceQueryEngine;		
+	public static void setEngine(Resource resource) throws IncQueryException {
+		engine = IncQueryEngine.on(resource);
+		runOnceEngine = new RunOnceQueryEngine(resource);	
 	}
 	
 	/**
