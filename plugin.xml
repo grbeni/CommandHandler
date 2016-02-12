@@ -9,6 +9,15 @@
     <menuContribution allPopups="false" locationURI="popup:org.eclipse.ui.navigator.ProjectExplorer#PopupMenu">
       <command commandId="hu.bme.mit.inf.yakindu.uppaal.integration.yakindu" label="YakinduToUppaal" style="push"/>
     </menuContribution>
+    <menuContribution
+          allPopups="false"
+          locationURI="popup:org.eclipse.jdt.ui.PackageExplorer">
+       <command
+             commandId="hu.bme.mit.inf.yakindu.uppaal.integration.yakindu"
+             label="YakinduToUppaal"
+             style="push">
+       </command>
+    </menuContribution>
   </extension>
   <extension point="org.eclipse.ui.handlers">
     <handler class="inc.CommandHandler" commandId="hu.bme.mit.inf.yakindu.uppaal.integration.yakindu"/>

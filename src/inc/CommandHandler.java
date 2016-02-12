@@ -80,6 +80,7 @@ import de.uni_paderborn.uppaal.templates.Template;
  *  - composite state kilépõ élei: legfelsõ ! él, minden alatta lévõ régióban ? élek isValidVar + " = false" -szal
  *  - különbözõ absztrakciós szinteket összekötõ élek
  */
+
 public class CommandHandler extends AbstractHandler {
 	
 	// IncQuery engines
@@ -214,7 +215,7 @@ public class CommandHandler extends AbstractHandler {
 	}	
 
 	/**
-	 * This method creates Uppaal global variables based on Yakindu internal and interface variables
+	 * This method creates Uppaal global variables based on Yakindu internal and interface variables.
 	 * Only handles integer and boolean types.
 	 * @throws IncQueryException
 	 */
