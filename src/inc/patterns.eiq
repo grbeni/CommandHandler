@@ -306,6 +306,9 @@ pattern inValues(interface : InterfaceScope, variable : VariableDefinition, name
 	VariableDefinition.initialValue(variable, initialValue);
 }
 
+/**
+ * Returns the triggered transitions.
+ */
 pattern transitionWithTrigger(transition : Transition) {
 	Transition.trigger(transition, _trigger);
 }

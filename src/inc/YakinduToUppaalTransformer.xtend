@@ -45,6 +45,7 @@ import org.yakindu.sct.model.stext.stext.EventRaisingExpression
 import org.yakindu.sct.model.stext.stext.LocalReaction
 
 import static inc.Helper.*
+import de.uni_paderborn.uppaal.templates.SynchronizationKind
 
 class YakinduToUppaalTransformer {
 	
@@ -879,15 +880,15 @@ class YakinduToUppaalTransformer {
 		for (SourceAndTargetOfTransitionsMatch sourceAndTargetOfTransitionsMatch : sourceAndTargetOfTransitionsMatcher.getAllMatches()) {
 			// So regularly transformed guards are not deleted
 			if (trace.builder.getEdgeGuard(trace.transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())) != null && trace.builder.getEdgeGuard(trace.transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())) != "") {
-				trace.builder.setEdgeGuard(trace.transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), trace.isActiveVar + " && " + "(" + trace.builder.getEdgeGuard(trace.transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())) + ")");
+				trace.builder.setEdgeGuard(trace.transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), trace.isActiveVar + " && " + "( " + trace.builder.getEdgeGuard(trace.transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())) + " )");
 				if (Helper.hasFinalState) {
-					trace.builder.setEdgeGuard(trace.transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), trace.builder.getEdgeGuard(trace.transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())) + "&& !" + trace.endVar)
+					trace.builder.setEdgeGuard(trace.transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), trace.builder.getEdgeGuard(trace.transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())) + " && !" + trace.endVar)
 				}
 			} 
 			else {
 				trace.builder.setEdgeGuard(trace.transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), trace.isActiveVar);
 				if (Helper.hasFinalState) {
-					trace.builder.setEdgeGuard(trace.transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), trace.builder.getEdgeGuard(trace.transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())) + "&& !" + trace.endVar)
+					trace.builder.setEdgeGuard(trace.transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition()), trace.builder.getEdgeGuard(trace.transitionEdgeMap.get(sourceAndTargetOfTransitionsMatch.getTransition())) + " && !" + trace.endVar)
 				}
 			}		
 		}
@@ -960,7 +961,9 @@ class YakinduToUppaalTransformer {
 	
 	/**
 	 * This method is responsible for creating the control template:
-	 * gather all the integer values that can be added as an in value. 
+	 * gather all the integer values that can be added as an in-value,
+	 * build the loop edges with ! syncs on them
+	 *  
 	 * @throws Exception 
 	 */
 	private def void createControlTemplate(Trace trace) throws Exception {
@@ -972,7 +975,7 @@ class YakinduToUppaalTransformer {
 		val inEventsMatcher = trace.engine.getMatcher(InEventsQuerySpecification.instance());
 		val inValuesMatcher = trace.engine.getMatcher(InValuesQuerySpecification.instance());
 		val inEventValuesMatcher = trace.engine.getMatcher(InEventValuesQuerySpecification.instance());
-		
+		// Creating the in-values
 		for (eventsWithTypeMatch : eventsWithTypeMatcher.getAllMatches()) {
 			if (eventsWithTypeMatch.getEvent().getType().getName() == "integer") {
 				trace.builder.addGlobalDeclaration("int " + Helper.getInEventValueName(eventsWithTypeMatch.getName()) + ";");
@@ -981,50 +984,51 @@ class YakinduToUppaalTransformer {
 				trace.builder.addGlobalDeclaration("bool " + Helper.getInEventValueName(eventsWithTypeMatch.getName()) + ";");
 			}
 		}
-		
+		// Creating the ! syncs
 		for (inEventsMatch : inEventsMatcher.getAllMatches()) {
 			var ownTriggerEdge = trace.builder.createEdge(controlTemplate);
 			trace.builder.setEdgeSource(ownTriggerEdge, controlLocation);
 			trace.builder.setEdgeTarget(ownTriggerEdge, controlLocation);
 			trace.builder.setEdgeSync(ownTriggerEdge, inEventsMatch.getName(), true);
+			// If the event is a typed in-event
 			if (inEventsMatch.getInEvent().getType() != null && inEventsMatch.getInEvent().getType().getName() == "integer") {
 				var updateLocation = trace.builder.createLocation(inEventsMatch.getName() + "_updateLocation", controlTemplate);
 				trace.builder.setLocationCommitted(updateLocation);
+				// The explicitly declared in values are added to sync
 				for (inValuesMatch : inValuesMatcher.getAllMatches()) {		
 					createUpdateValueEdge(ownTriggerEdge, updateLocation, controlLocation, inEventsMatch.getName(), inValuesMatch.getInitialValue(), trace);
 				}
+				// The compared values can be added now to the sync
 				for (inEventValuesMatch : inEventValuesMatcher.getAllMatches()) {					
 					createUpdateValueEdge(ownTriggerEdge, updateLocation, controlLocation, inEventsMatch.getName(), inEventValuesMatch.getRightOperand(), trace);
 				}
 			}
 		}		
-		createTriggers(controlTemplate, controlLocation, trace);
+		createTriggers(trace);
 	}
 	
 	/**
 	 * This method is responsible for placing the triggers on the mapped edges as synchronizations 
 	 * and duplicate edges if the trigger in the Yakindu model is composite.
-	 * @param controlTemplate The control template, we want to handle the triggers from.
-	 * @param controlLocation The only location in the control template.
 	 * @throws Exception
 	 */
-	private def createTriggers(Template controlTemplate, Location controlLocation, Trace trace) throws Exception {
-		val transitionMatcher = trace.engine.getMatcher(TriggerOfTransitionQuerySpecification.instance());
+	private def createTriggers(Trace trace) throws Exception {
+		val triggeredTransitionMatcher = trace.engine.getMatcher(TriggerOfTransitionQuerySpecification.instance());
 		var triggeredTransitions = new HashSet<Transition>();
 		var id = 0;
-		for (triggerOfTransitionMatch : transitionMatcher.getAllMatches()) {	
+		for (triggerOfTransitionMatch : triggeredTransitionMatcher.getAllMatches()) {	
 			// If the mappeed edge already has a trigger, then we clone it, so the next part may not overwrite it
 			if (triggeredTransitions.contains(triggerOfTransitionMatch.getTransition())) {
 				trace.builder.cloneEdge(trace.transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()));
 			}
-			// If the mapped edge already has a sync, we have to create a syncing location
-			if (trace.transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization() != null) {
+			// If the mapped edge already has a ! sync, we have to create a syncing location
+			if (trace.transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization() != null && trace.transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization().kind == SynchronizationKind.SEND) {
 				var syncEdge = createSyncLocation(trace.builder.getEdgeTarget(trace.transitionEdgeMap.get(triggerOfTransitionMatch.getTransition())), "triggerLocation" + (id += 1), trace.transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()).getSynchronization(), trace);
 				trace.builder.setEdgeTarget(trace.transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), trace.builder.getEdgeSource(syncEdge));
 				trace.builder.setEdgeSync(trace.transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), triggerOfTransitionMatch.getTriggerName(), false);
 				triggeredTransitions.add(triggerOfTransitionMatch.getTransition());
-				//hasTriggerPlusEdge.put(triggerOfTransitionMatch.getTransition(), syncEdge);
-			}
+				}
+			// If no sync, or ? sync 
 			else {
 				trace.builder.setEdgeSync(trace.transitionEdgeMap.get(triggerOfTransitionMatch.getTransition()), triggerOfTransitionMatch.getTriggerName(), false);
 				triggeredTransitions.add(triggerOfTransitionMatch.getTransition());
@@ -1033,12 +1037,12 @@ class YakinduToUppaalTransformer {
 	}	
 	
 	/**
-	 * To avoid code duplication.
-	 * @param ownTriggerEdge
-	 * @param updateLocation
-	 * @param controlLocation
-	 * @param inEventName
-	 * @param expression
+	 * This method creates and update-edgein the control template so values of in events can be first updated then fired.
+	 * @param ownTriggerEdge The Uppaal edge that contains the in event ! synchronization
+	 * @param updateLocation The Uppaal location that will be the target of the update edge
+	 * @param controlLocation The Uppaal location that will be the source of the update edge
+	 * @param inEventName The name of the Yakindu in event with value
+	 * @param expression The Uppaal string update expression to be written onto the update edge
 	 * @throws IncQueryException
 	 */
 	private def createUpdateValueEdge(Edge ownTriggerEdge, Location updateLocation, Location controlLocation, String inEventName, Expression expression, Trace trace) throws IncQueryException {
@@ -1051,19 +1055,18 @@ class YakinduToUppaalTransformer {
 	}
 	
 	/**
-	 * Ez a metódus létrehoz egy szinkronizációs élet egy új location-bõl és azt beleköti a targetbe, ráírva a megadott szinkornizációt.
-	 * @param target A location, ahova kötni szeretnénk az élet.
-	 * @param locationName A név, amelyet adni szeretnénk a létrehozott locationnek.
-	 * @param sync A szinkronizáció, amelyet rá szeretnénk tenni az élre.
-	 * @param template A template, amelybe bele szeretnénk rakni a létrehozott locationt.
-	 * @return A szinkronizáció edge, amely a létrehozott locationbõl belevezet a target locationbe.
-	 * @throws Exception Ezt akkor dobja, ha az átadott szinkornizáció ? szinkornizáció. Ekkor a létrehozott struktúra nem mûködhet jól.
+	 * This method creates a new location and a synchronization edge then sets the synchronization of the edge with the given sync.
+	 * @param target Uppal location, the target of the new synced edge
+	 * @param locationName Name of the new location
+	 * @param sync Uppaal synchrnoization to be written onto the edge
+	 * @return The recently created synchronization edge
+	 * @throws Exception Shows that a ? synch is to be placed on the edge.
 	 */
 	private def createSyncLocation(Location target, String locationName, Synchronization sync, Trace trace) throws Exception {
 		if (sync != null && sync.getKind().getValue() == 0) {
 			throw new Exception("A ? snyc is wanted to be placed.");
 		}
-		val template = target.getParentTemplate();
+		var template = target.getParentTemplate();
 		var syncLocation = trace.builder.createLocation(locationName, template);
 		trace.builder.setLocationCommitted(syncLocation);
 		var syncEdge = trace.builder.createEdge(template);
@@ -1074,13 +1077,12 @@ class YakinduToUppaalTransformer {
 	}	
 	
 	/**
-	 * Ez a metódus létrehoz egy szinkronizációs élet egy új location-bõl és azt beleköti a targetbe, ráírva a megadott szinkornizációt.
-	 * @param target A location, ahova kötni szeretnénk az élet.
-	 * @param locationName A név, amelyet adni szeretnénk a létrehozott locationnek.
-	 * @param sync A szinkronizáció, amelyet rá szeretnénk tenni az élre.
-	 * @param template A template, amelybe bele szeretnénk rakni a létrehozott locationt.
-	 * @return A szinkronizáció edge, amely a létrehozott locationbõl belevezet a target locationbe.
-	 * @throws Exception Ezt akkor dobja, ha az átadott szinkornizáció ? szinkornizáció. Ekkor a létrehozott struktúra nem mûködhet jól.
+	 * This method creates a new location and a synchronization edge then sets the synchronization of the edge with the given sync.
+	 * @param target Uppal location, the target of the new synced edge
+	 * @param locationName Name of the new location
+	 * @param sync Uppaal synchrnoization to be written onto the edge
+	 * @return The recently created synchronization edge
+	 * @throws Exception Shows that a ? synch is to be placed on the edge.
 	 */
 	private def createSyncLocationWithString(Location target, String locationName, String sync, Trace trace) throws Exception {
 		var template = target.getParentTemplate();
@@ -1091,7 +1093,6 @@ class YakinduToUppaalTransformer {
 		trace.builder.setEdgeTarget(syncEdge, target);
 		trace.builder.setEdgeSync(syncEdge, sync, true);
 		return syncEdge;
-	}
-	
+	}	
 	
 }
